@@ -207,7 +207,7 @@ func DAD(rp byte) Instruction {
 			v1 := lookup16(m.selectDoubleOperand(2)) // HL registers.
 			v2 := lookup16(m.selectDoubleOperand(rp))
 
-			result := int32(v1) + int32(v2)
+			result := int32(uint16(v1)) + int32(uint16(v2))
 			m.Registers.H = byte((result >> 8) & 0xFF)
 			m.Registers.L = byte(result & 0xFF)
 			m.PSW.C = result > 0xFFFF
@@ -380,11 +380,11 @@ func RRC() Instruction {
 }
 
 // Rcnd implements the conditional return instruction.
-func Rcnd(cnd func(*Machine) bool) Instruction {
+func Rcnd(cnd byte) Instruction {
 	return Instruction{
 		Size: 1,
 		Execute: func(m *Machine) {
-			if cnd(m) {
+			if condition(cnd)(m) {
 				m.PC = m.pop16()
 			}
 		},
