@@ -1,26 +1,56 @@
 package arch
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
+
+type PSW struct {
+	Z bool // Zero flag
+	S bool // Sign flag
+	P bool // Parity flag
+	C bool // Carry flag
+	A bool // Auxiliary carry flag for decimal arithmetics
+}
+
+type Registers struct {
+	A, B, C, D, E, H, L byte // 8-bit general-purpose registers
+}
+
+type Memory [65536]byte
+
+func (m *Memory) DumpSparse(out io.Writer) error {
+	for i := range m {
+		if m[i] != 0 {
+			_, err := fmt.Fprintf(out, "%04x: 0x%02x\n", i, m[i])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 type Machine struct {
-	Registers struct {
-		A, B, C, D, E, H, L byte // 8-bit general-purpose registers
-	}
-	PC  uint16 // Program Counter
-	SP  uint16 // Stack Pointer
-	PSW struct {
-		Z bool // Zero flag
-		S bool // Sign flag
-		P bool // Parity flag
-		C bool // Carry flag
-		A bool // Auxiliary carry flag for decimal arithmetics
-	}
-	Memory [65536]byte // 64KB memory space
+	Registers Registers
+	PSW       PSW
+
+	PC     uint16 // Program Counter
+	SP     uint16 // Stack Pointer
+	Memory Memory // 64KB memory space
 }
 
 func (m *Machine) String() string {
 	return fmt.Sprintf("A: %02x B: %02x C: %02x D: %02x E: %02x H: %02x L: %02x PC: %04x SP: %04x ZSPCA: %v",
 		m.Registers.A, m.Registers.B, m.Registers.C, m.Registers.D, m.Registers.E, m.Registers.H, m.Registers.L, m.PC, m.SP, m.PSW)
+}
+
+func (m *Machine) Exec(ins Instruction) {
+	pc := m.PC
+	ins.Execute(m)
+	if pc == m.PC {
+		m.PC += uint16(ins.Size)
+	}
 }
 
 func (m *Machine) psw() byte {
@@ -140,6 +170,6 @@ func (m *Machine) pop16() uint16 {
 }
 
 type Instruction struct {
-	Size    int
+	Size    byte
 	Execute func(m *Machine)
 }

@@ -7,12 +7,50 @@ type InstructionSet struct {
 
 func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 	switch cmdByte := data[0]; cmdByte {
+	case 0x00:
+		return NOP(), 1, nil
+	case 0x2F:
+		return CMA(), 1, nil
 	case 0x3F:
 		return CMC(), 1, nil
 	case 0x37:
 		return STC(), 1, nil
+	case 0xC6:
+		return ADI(data[1]), 2, nil
+	case 0xCE:
+		return ACI(data[1]), 2, nil
+	case 0xE6:
+		return ANI(data[1]), 2, nil
+	case 0xCD:
+		return CALL(nextWord(data)), 3, nil
 	default:
-
-		return Instruction{}, 0, fmt.Errorf("unknown instruction %02x", data[0])
+		// Addition with register.
+		if cmdByte>>4 == 8 {
+			r := cmdByte & 0x07
+			if mask(cmdByte, 0x08) {
+				return ADC(r), 1, nil
+			} else {
+				return ADD(r), 1, nil
+			}
+		}
+		// And with register.
+		if cmdByte>>3 == 0x14 {
+			return ANA(cmdByte & 0x07), 1, nil
+		}
+		// Conditional call.
+		if cmdByte&0x7 == 0x4 && mask(cmdByte, 0xC0) {
+			cnd := (cmdByte & 0x38) >> 3
+			return Ccnd(cnd, nextWord(data)), 3, nil
+		}
+		// Compare with a register.
+		if cmdByte>>3 == 0x17 {
+			r := cmdByte & 0x07
+			return CMP(r), 1, nil
+		}
+		return Instruction{}, 0, fmt.Errorf("unknown instruction 0x%02x", data[0])
 	}
 }
+
+func nextWord(data []byte) uint16 { return uint16(data[1]) | uint16(data[2])<<8 }
+
+func mask(cmdByte, mask byte) bool { return (cmdByte & mask) == mask }

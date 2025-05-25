@@ -390,3 +390,51 @@ func TestRAR(t *testing.T) {
 		t.Errorf("RAR: Carry = %v, want true", m.PSW.C)
 	}
 }
+
+func TestSTA(t *testing.T) {
+	var m Machine
+	m.Registers.A = 0x56
+	addr := uint16(0x1234)
+
+	STA(addr).Execute(&m)
+
+	if m.Memory[addr] != m.Registers.A {
+		t.Errorf("STA: Memory[0x1234] = %X, want %X", m.Memory[addr], m.Registers.A)
+	}
+}
+
+func TestLDA(t *testing.T) {
+	var m Machine
+	addr := uint16(0x1234)
+	m.Memory[addr] = 0x7F
+
+	LDA(addr).Execute(&m)
+
+	if m.Registers.A != 0x7F {
+		t.Errorf("LDA: A = %X, want %X", m.Registers.A, 0x7F)
+	}
+}
+
+func TestJMP(t *testing.T) {
+	var m Machine
+	targetAddr := uint16(0x4567)
+
+	JMP(targetAddr).Execute(&m)
+
+	if m.PC != targetAddr {
+		t.Errorf("JMP: PC = %X, want PC to be %X", m.PC, targetAddr)
+	}
+}
+
+func TestCZ(t *testing.T) {
+	var m Machine
+	m.PSW.Z = true
+	m.PC = 0x1234
+	callAddr := uint16(0x3456)
+
+	CZ(callAddr).Execute(&m)
+
+	if m.PSW.Z && m.PC != callAddr {
+		t.Errorf("CZ: PC = %X, want PC = %X (when Zero flag is set)", m.PC, callAddr)
+	}
+}

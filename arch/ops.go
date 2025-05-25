@@ -1,5 +1,7 @@
 package arch
 
+import "fmt"
+
 func lookup8(r *byte, mem []byte) int16 {
 	if r != nil {
 		return int16(*r)
@@ -101,12 +103,35 @@ func CALL(addr uint16) Instruction {
 	}
 }
 
+func condition(cnd byte) func(*Machine) bool {
+	switch cnd {
+	case 0:
+		return func(m *Machine) bool { return !m.PSW.Z }
+	case 1:
+		return func(m *Machine) bool { return m.PSW.Z }
+	case 2:
+		return func(m *Machine) bool { return !m.PSW.C }
+	case 3:
+		return func(m *Machine) bool { return m.PSW.C }
+	case 4:
+		return func(m *Machine) bool { return !m.PSW.P }
+	case 5:
+		return func(m *Machine) bool { return m.PSW.P }
+	case 6:
+		return func(m *Machine) bool { return !m.PSW.S }
+	case 7:
+		return func(m *Machine) bool { return m.PSW.S }
+	default:
+		panic(fmt.Errorf("invalid condition: 0x%02x", cnd))
+	}
+}
+
 // Ccnd implements the conditional CALL instruction.
-func Ccnd(cnd func(*Machine) bool, addr uint16) Instruction {
+func Ccnd(cnd byte, addr uint16) Instruction {
 	return Instruction{
 		Size: 3,
 		Execute: func(m *Machine) {
-			if cnd(m) {
+			if condition(cnd)(m) {
 				m.push16(m.PC + 3)
 				m.PC = addr
 			}
@@ -618,5 +643,47 @@ func INX(rp byte) Instruction {
 				m.SP++
 			}
 		},
+	}
+}
+
+// LDA implements the LDA instruction (Load Accumulator Directly).
+func LDA(addr uint16) Instruction {
+	return Instruction{
+		Size: 3,
+		Execute: func(m *Machine) {
+			m.Registers.A = m.Memory[addr]
+		},
+	}
+}
+
+// JMP implements the JMP instruction (Jump Unconditionally).
+func JMP(addr uint16) Instruction {
+	return Instruction{
+		Size: 3,
+		Execute: func(m *Machine) {
+			m.PC = addr
+		},
+	}
+}
+
+// CZ implements the CZ instruction (Call if Zero Flag is Set).
+func CZ(addr uint16) Instruction {
+	return Instruction{
+		Size: 3,
+		Execute: func(m *Machine) {
+			if m.PSW.Z {
+				m.Memory[m.SP-1] = byte((m.PC >> 8) & 0xFF) // Store high byte of PC
+				m.Memory[m.SP-2] = byte(m.PC & 0xFF)        // Store low byte of PC
+				m.SP -= 2                                   // Update SP
+				m.PC = addr                                 // Jump to the address
+			}
+		},
+	}
+}
+
+func NOP() Instruction {
+	return Instruction{
+		Size:    1,
+		Execute: func(m *Machine) {},
 	}
 }
