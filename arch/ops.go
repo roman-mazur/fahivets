@@ -768,3 +768,40 @@ func IN(port byte) Instruction {
 		Execute: func(m *Machine) { m.Registers.A = m.In[port] },
 	}
 }
+
+// MOV implements the MOV instruction (Move Data from Source to Destination Register or Memory).
+func MOV(dst byte, src byte) Instruction {
+	return Instruction{
+		Size: 1,
+		Execute: func(m *Machine) {
+			srcR, srcMem := m.selectOperand(src)
+			var val byte
+			if srcMem != nil {
+				val = srcMem[0]
+			} else {
+				val = *srcR
+			}
+			dstR, dstMem := m.selectOperand(dst)
+			if dstMem != nil {
+				dstMem[0] = val
+			} else {
+				*dstR = val
+			}
+		},
+	}
+}
+
+// MVI implements the MVI instruction (Move Immediate to Register or Memory).
+func MVI(dst byte, data byte) Instruction {
+	return Instruction{
+		Size: 2,
+		Execute: func(m *Machine) {
+			dstR, dstMem := m.selectOperand(dst)
+			if dstMem != nil {
+				dstMem[0] = data
+			} else {
+				*dstR = data
+			}
+		},
+	}
+}

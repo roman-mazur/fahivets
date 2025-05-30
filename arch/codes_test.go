@@ -1413,6 +1413,86 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 			},
 			expectedSize: 3,
 		},
+		{
+			name:  "MOV (Move Register B to Register A)",
+			input: []byte{0x78}, // MOV A, B
+			initialState: Machine{
+				PC: 0x5000,
+				Registers: Registers{
+					B: 0x56,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x5001,
+				Registers: Registers{
+					A: 0x56,
+					B: 0x56,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "MOV (Move Memory to Register L)",
+			input: []byte{0x6E}, // MOV L, M
+			initialState: Machine{
+				PC: 0x6000,
+				Registers: Registers{
+					H: 0x20,
+					L: 0x10,
+				},
+				Memory: Memory{
+					0x2010: 0x89,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x6001,
+				Registers: Registers{
+					H: 0x20,
+					L: 0x89,
+				},
+				Memory: Memory{
+					0x2010: 0x89,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "MVI (Move Immediate to Register B)",
+			input: []byte{0x06, 0xAB}, // MVI B, 0xAB
+			initialState: Machine{
+				PC: 0x7000,
+			},
+			expectedState: Machine{
+				PC: 0x7002,
+				Registers: Registers{
+					B: 0xAB,
+				},
+			},
+			expectedSize: 2,
+		},
+		{
+			name:  "MVI (Move Immediate to Memory Location Indexed by HL)",
+			input: []byte{0x36, 0xCD}, // MVI M, 0xCD
+			initialState: Machine{
+				PC: 0x8000,
+				Registers: Registers{
+					H: 0x22,
+					L: 0x10,
+				},
+				Memory: Memory{},
+			},
+			expectedState: Machine{
+				PC: 0x8002,
+				Registers: Registers{
+					H: 0x22,
+					L: 0x10,
+				},
+				Memory: Memory{
+					0x2210: 0xCD,
+				},
+			},
+			expectedSize: 2,
+		},
 	}
 
 	for _, tc := range testCases {

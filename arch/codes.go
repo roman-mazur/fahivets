@@ -165,6 +165,16 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 			return LXI(rp, nextWord(data)), 3, nil
 		}
 
+		// Move.
+		switch sel := cmdByte >> 6; sel {
+		case 0:
+			if cmdByte&0x07 == 0x06 {
+				return MVI(cmdByte>>3&0x07, data[1]), 2, nil
+			}
+		case 1:
+			return MOV(cmdByte>>3&0x07, cmdByte&0x07), 1, nil
+		}
+
 		return Instruction{}, 0, fmt.Errorf("unknown instruction 0x%02x", data[0])
 	}
 }
