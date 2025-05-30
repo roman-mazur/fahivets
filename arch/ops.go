@@ -199,6 +199,13 @@ func DAA() Instruction {
 	}
 }
 
+func storeDoubleAdd(m *Machine, h, l *byte, v1, v2 int32) int32 {
+	result := v1 + v2
+	*h = byte((result >> 8) & 0xFF)
+	*l = byte(result & 0xFF)
+	return result
+}
+
 // DAD implements the DAD instruction (Double Add).
 func DAD(rp byte) Instruction {
 	return Instruction{
@@ -207,10 +214,8 @@ func DAD(rp byte) Instruction {
 			v1 := lookup16(m.selectDoubleOperand(2)) // HL registers.
 			v2 := lookup16(m.selectDoubleOperand(rp))
 
-			result := int32(uint16(v1)) + int32(uint16(v2))
-			m.Registers.H = byte((result >> 8) & 0xFF)
-			m.Registers.L = byte(result & 0xFF)
-			m.PSW.C = result > 0xFFFF
+			res := storeDoubleAdd(m, &m.Registers.H, &m.Registers.L, int32(v1), int32(v2))
+			m.PSW.C = res > 0xFFFF
 		},
 	}
 }
@@ -257,18 +262,12 @@ func LXI(rp byte, data uint16) Instruction {
 	return Instruction{
 		Size: 3,
 		Execute: func(m *Machine) {
-			switch rp {
-			case 0:
-				m.Registers.B = byte((data >> 8) & 0xFF)
-				m.Registers.C = byte(data & 0xFF)
-			case 1:
-				m.Registers.D = byte((data >> 8) & 0xFF)
-				m.Registers.E = byte(data & 0xFF)
-			case 2:
-				m.Registers.H = byte((data >> 8) & 0xFF)
-				m.Registers.L = byte(data & 0xFF)
-			case 3:
-				m.SP = data
+			h, l, sp := m.selectDoubleOperand(rp)
+			if sp != nil {
+				*sp = data
+			} else {
+				*h = byte((data >> 8) & 0xFF)
+				*l = byte(data & 0xFF)
 			}
 		},
 	}
@@ -575,6 +574,31 @@ func XCHG() Instruction {
 	}
 }
 
+// XTHL implements the XTHL instruction (Exchange Top of Stack with H and L).
+func XTHL() Instruction {
+	return Instruction{
+		Size: 1,
+		Execute: func(m *Machine) {
+			top := m.Memory[m.SP]
+			next := m.Memory[m.SP+1]
+			m.Memory[m.SP], m.Registers.L = m.Registers.L, top
+			m.Memory[m.SP+1], m.Registers.H = m.Registers.H, next
+		},
+	}
+}
+
+// XRI implements the XRI instruction (Exclusive OR Immediate with Accumulator).
+func XRI(data byte) Instruction {
+	return Instruction{
+		Size: 2,
+		Execute: func(m *Machine) {
+			m.Registers.A ^= data
+			m.setZSPC(int16(m.Registers.A))
+			m.PSW.C = false
+		},
+	}
+}
+
 // XRA implements the XRA instruction (Exclusive OR Register or Memory with Accumulator).
 func XRA(r byte) Instruction {
 	return Instruction{
@@ -618,30 +642,32 @@ func LHLD(addr uint16) Instruction {
 	}
 }
 
+// INR implements the INR instruction (Increment Register or Memory).
+func INR(r byte) Instruction {
+	return Instruction{
+		Size: 1,
+		Execute: func(m *Machine) {
+			reg, mem := m.selectOperand(r)
+			if mem != nil {
+				addDst(m, &mem[0], 1, true)
+			} else {
+				addDst(m, reg, 1, true)
+			}
+		},
+	}
+}
+
 // INX implements the INX instruction (Increment Register Pair).
 func INX(rp byte) Instruction {
 	return Instruction{
 		Size: 1,
 		Execute: func(m *Machine) {
-			switch rp {
-			case 0: // B and C
-				BC := uint16(m.Registers.B)<<8 | uint16(m.Registers.C)
-				BC++
-				m.Registers.B = byte((BC >> 8) & 0xFF)
-				m.Registers.C = byte(BC & 0xFF)
-			case 1: // D and E
-				DE := uint16(m.Registers.D)<<8 | uint16(m.Registers.E)
-				DE++
-				m.Registers.D = byte((DE >> 8) & 0xFF)
-				m.Registers.E = byte(DE & 0xFF)
-			case 2: // H and L
-				HL := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
-				HL++
-				m.Registers.H = byte((HL >> 8) & 0xFF)
-				m.Registers.L = byte(HL & 0xFF)
-			case 3: // SP
-				m.SP++
+			h, l, sp := m.selectDoubleOperand(rp)
+			if sp != nil {
+				*sp++
+				return
 			}
+			storeDoubleAdd(m, h, l, int32(*h)<<8|int32(*l), 1)
 		},
 	}
 }
@@ -656,12 +682,35 @@ func LDA(addr uint16) Instruction {
 	}
 }
 
+// LDAX implements the LDAX instruction (Load Accumulator Indirectly from Register Pair).
+func LDAX(rp byte) Instruction {
+	return Instruction{
+		Size: 1,
+		Execute: func(m *Machine) {
+			h, l, sp := m.selectDoubleOperand(rp)
+			if sp != nil {
+				panic("LDAX with SP")
+			}
+			m.Registers.A = m.Memory[uint16(*h)<<8|uint16(*l)]
+		},
+	}
+}
+
 // JMP implements the JMP instruction (Jump Unconditionally).
 func JMP(addr uint16) Instruction {
 	return Instruction{
+		Size:    3,
+		Execute: func(m *Machine) { m.PC = addr },
+	}
+}
+
+func JCnd(cnd byte, addr uint16) Instruction {
+	return Instruction{
 		Size: 3,
 		Execute: func(m *Machine) {
-			m.PC = addr
+			if condition(cnd)(m) {
+				m.PC = addr
+			}
 		},
 	}
 }
@@ -685,5 +734,37 @@ func NOP() Instruction {
 	return Instruction{
 		Size:    1,
 		Execute: func(m *Machine) {},
+	}
+}
+
+// EI implements the EI instruction (Enable Interrupts).
+func EI() Instruction {
+	return Instruction{
+		Size:    1,
+		Execute: func(m *Machine) { m.Interrupts = true },
+	}
+}
+
+// DI implements the DI instruction (Disable Interrupts).
+func DI() Instruction {
+	return Instruction{
+		Size:    1,
+		Execute: func(m *Machine) { m.Interrupts = false },
+	}
+}
+
+// HLT implements the HLT instruction (Halt Execution).
+func HLT() Instruction {
+	return Instruction{
+		Size:    1,
+		Execute: func(m *Machine) { m.PC = 0 },
+	}
+}
+
+// IN implements the IN instruction (Input from Port to Accumulator).
+func IN(port byte) Instruction {
+	return Instruction{
+		Size:    2,
+		Execute: func(m *Machine) { m.Registers.A = m.In[port] },
 	}
 }

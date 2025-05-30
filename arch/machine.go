@@ -31,13 +31,18 @@ func (m *Memory) DumpSparse(out io.Writer) error {
 	return nil
 }
 
+type Ports [256]byte
+
 type Machine struct {
 	Registers Registers
-	PSW       PSW
 
-	PC     uint16 // Program Counter
-	SP     uint16 // Stack Pointer
-	Memory Memory // 64KB memory space
+	PSW PSW
+	PC  uint16 // Program Counter
+	SP  uint16 // Stack Pointer
+
+	Memory     Memory // 64KB memory space
+	Interrupts bool
+	In, Out    Ports
 }
 
 func (m *Machine) String() string {

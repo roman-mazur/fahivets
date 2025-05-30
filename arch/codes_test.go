@@ -53,6 +53,26 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 			expectedSize: 1,
 		},
 		{
+			name:  "ADC B (A = A + B + Carry, no carry)",
+			input: []byte{0x88}, // ADC B
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					A: 0x01,
+					B: 0x02,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					A: 0x03,
+					B: 0x02,
+				},
+				PSW: PSW{P: true},
+			},
+			expectedSize: 1,
+		},
+		{
 			name:  "ADD B",
 			input: []byte{0x80},
 			initialState: Machine{
@@ -263,9 +283,6 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 				PC: 0x1001,
 				Registers: Registers{
 					B: 0x02,
-				},
-				PSW: PSW{
-					P: true,
 				},
 			},
 			expectedSize: 1,
@@ -911,6 +928,490 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 				SP:  0x2000,
 			},
 			expectedSize: 2,
+		},
+		{
+			name:  "SHLD",
+			input: []byte{0x22, 0x22, 0x11}, // SHLD 0x1122
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					H: 0x02,
+					L: 0x03,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1003,
+				Registers: Registers{
+					H: 0x02,
+					L: 0x03,
+				},
+				Memory: Memory{0x1122: 0x03, 0x1123: 0x02},
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "SPHL",
+			input: []byte{0xF9},
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					H: 0x02,
+					L: 0x03,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				SP: 0x0203,
+				Registers: Registers{
+					H: 0x02,
+					L: 0x03,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "STA",
+			input: []byte{0x32, 0x44, 0x33}, // STA 0x3344
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					A: 0x2A,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1003,
+				Registers: Registers{
+					A: 0x2A,
+				},
+				Memory: Memory{0x3344: 0x2A},
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "SUB",
+			input: []byte{0x90}, // SUB B
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					A: 0x0A,
+					B: 0x05,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					A: 0x05,
+					B: 0x05,
+				},
+				PSW: PSW{
+					P: true,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "SUI",
+			input: []byte{0xD6, 0x05}, // SUI 0x05
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					A: 0x0A,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1002,
+				Registers: Registers{
+					A: 0x05,
+				},
+				PSW: PSW{
+					P: true,
+				},
+			},
+			expectedSize: 2,
+		},
+		{
+			name:  "XCHG (Exchange H-L with D-E)",
+			input: []byte{0xEB}, // XCHG
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					H: 0x12,
+					L: 0x34,
+					D: 0x56,
+					E: 0x78,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					H: 0x56,
+					L: 0x78,
+					D: 0x12,
+					E: 0x34,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "XRA A (A = A ^ A, result is 0)",
+			input: []byte{0xAF}, // XRA A
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					A: 0xFF,
+				},
+				PSW: PSW{},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					A: 0x00,
+				},
+				PSW: PSW{Z: true, P: false},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "XRI",
+			input: []byte{0xEE, 0x55}, // XRI 0x55
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					A: 0xAA,
+				},
+				PSW: PSW{},
+			},
+			expectedState: Machine{
+				PC: 0x1002,
+				Registers: Registers{
+					A: 0xFF, // A = 0xAA ^ 0x55
+				},
+				PSW: PSW{P: true}, // Parity is true (0xFF has an odd number of 1s)
+			},
+			expectedSize: 2,
+		},
+		{
+			name:  "XTHL (Exchange H-L with top of stack)",
+			input: []byte{0xE3}, // XTHL
+			initialState: Machine{
+				PC:        0x1000,
+				SP:        0x2002,
+				Registers: Registers{H: 0x12, L: 0x34},
+				Memory:    Memory{0x2002: 0x56, 0x2003: 0x78},
+			},
+			expectedState: Machine{
+				PC:        0x1001,
+				SP:        0x2002,
+				Registers: Registers{H: 0x56, L: 0x78},
+				Memory:    Memory{0x2002: 0x56, 0x2003: 0x78},
+			},
+			expectedSize: 1,
+		},
+
+		{
+			name:  "EI (Enable Interrupts)",
+			input: []byte{0xFB}, // EI
+			initialState: Machine{
+				PC: 0x1000,
+			},
+			expectedState: Machine{
+				PC:         0x1001,
+				Interrupts: true,
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "DI (Disable Interrupts)",
+			input: []byte{0xF3}, // DI
+			initialState: Machine{
+				PC:         0x1000,
+				Interrupts: true,
+			},
+			expectedState: Machine{
+				PC:         0x1001,
+				Interrupts: false,
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "HLT (Halt Execution)",
+			input: []byte{0x76}, // HLT
+			initialState: Machine{
+				PC: 0x1000,
+			},
+			expectedState: Machine{
+				PC: 0,
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "IN (Input from port)",
+			input: []byte{0xDB, 0x10}, // IN 0x10
+			initialState: Machine{
+				PC: 0x1000,
+				In: Ports{0x10: 0x7F}, // Port 0x10 holds the value 0x7F
+			},
+			expectedState: Machine{
+				PC: 0x1002,
+				In: Ports{0x10: 0x7F}, // Port state remains unchanged
+				Registers: Registers{
+					A: 0x7F, // Value from port 0x10 loaded into the accumulator (A)
+				},
+			},
+			expectedSize: 2,
+		},
+		{
+			name:  "INX H (Increment HL Pair)",
+			input: []byte{0x23}, // INX H
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					H: 0x12,
+					L: 0x34,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					H: 0x12, // High byte remains 0x12
+					L: 0x35, // Low byte incremented by 1
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "INX H (Increment HL Pair with Carry)",
+			input: []byte{0x23}, // INX H
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					H: 0x12,
+					L: 0xFF,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					H: 0x13, // High byte incremented due to carry
+					L: 0x00, // Low byte becomes 0x00
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "JMP (Unconditional Jump)",
+			input: []byte{0xC3, 0x00, 0x20}, // JMP 0x2000
+			initialState: Machine{
+				PC: 0x1000,
+			},
+			expectedState: Machine{
+				PC: 0x2000, // Program counter jumps to 0x2000
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "JC (Jump if Carry - Carry Set)",
+			input: []byte{0xDA, 0x00, 0x20}, // JC 0x2000
+			initialState: Machine{
+				PC:  0x1000,
+				PSW: PSW{C: true}, // Carry flag is set
+			},
+			expectedState: Machine{
+				PC:  0x2000,       // Program counter jumps to 0x2000
+				PSW: PSW{C: true}, // Carry flag remains unchanged
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "JC (Jump if Carry - Carry Not Set)",
+			input: []byte{0xDA, 0x00, 0x20}, // JC 0x2000
+			initialState: Machine{
+				PC:  0x1000,
+				PSW: PSW{C: false}, // Carry flag is not set
+			},
+			expectedState: Machine{
+				PC:  0x1003,        // Program counter just increments
+				PSW: PSW{C: false}, // Carry flag remains unchanged
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "JZ (Jump if Zero - Zero Flag Set)",
+			input: []byte{0xCA, 0x00, 0x20}, // JZ 0x2000
+			initialState: Machine{
+				PC:  0x1000,
+				PSW: PSW{Z: true}, // Zero flag is set
+			},
+			expectedState: Machine{
+				PC:  0x2000,       // Program counter jumps to 0x2000
+				PSW: PSW{Z: true}, // Zero flag remains unchanged
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "JZ (Jump if Zero - Zero Flag Not Set)",
+			input: []byte{0xCA, 0x00, 0x20}, // JZ 0x2000
+			initialState: Machine{
+				PC:  0x1000,
+				PSW: PSW{Z: false}, // Zero flag is not set
+			},
+			expectedState: Machine{
+				PC:  0x1003,        // Program counter just increments
+				PSW: PSW{Z: false}, // Zero flag remains unchanged
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "LDA (Load Accumulator Direct Address)",
+			input: []byte{0x3A, 0x10, 0x20}, // LDA 0x2010
+			initialState: Machine{
+				PC: 0x1000,
+				Memory: Memory{
+					0x2010: 0xAB,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1003,
+				Registers: Registers{
+					A: 0xAB,
+				},
+				Memory: Memory{
+					0x2010: 0xAB,
+				},
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "LDAX (Load Accumulator Indirect Address from BC)",
+			input: []byte{0x0A}, // LDAX BC
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					B: 0x20,
+					C: 0x10,
+				},
+				Memory: Memory{
+					0x2010: 0xAB,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					A: 0xAB,
+					B: 0x20,
+					C: 0x10,
+				},
+				Memory: Memory{
+					0x2010: 0xAB,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "LDAX (Load Accumulator Indirect Address from DE)",
+			input: []byte{0x1A}, // LDAX D
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					D: 0x30,
+					E: 0x20,
+				},
+				Memory: Memory{
+					0x3020: 0xCD,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1001,
+				Registers: Registers{
+					A: 0xCD,
+					D: 0x30,
+					E: 0x20,
+				},
+				Memory: Memory{
+					0x3020: 0xCD,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "LHLD (Load H and L Direct Address)",
+			input: []byte{0x2A, 0x10, 0x20}, // LHLD 0x2010
+			initialState: Machine{
+				PC: 0x1000,
+				Memory: Memory{
+					0x2010: 0x34,
+					0x2011: 0x12,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1003,
+				Registers: Registers{
+					L: 0x34,
+					H: 0x12,
+				},
+				Memory: Memory{
+					0x2010: 0x34,
+					0x2011: 0x12,
+				},
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "LXI (Load Register Pair Immediate - BC)",
+			input: []byte{0x01, 0x34, 0x12}, // LXI B, 0x1234
+			initialState: Machine{
+				PC: 0x1000,
+			},
+			expectedState: Machine{
+				PC: 0x1003,
+				Registers: Registers{
+					B: 0x12,
+					C: 0x34,
+				},
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "LXI (Load Register Pair Immediate - DE)",
+			input: []byte{0x11, 0x78, 0x56}, // LXI D, 0x5678
+			initialState: Machine{
+				PC: 0x2000,
+			},
+			expectedState: Machine{
+				PC: 0x2003,
+				Registers: Registers{
+					D: 0x56,
+					E: 0x78,
+				},
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "LXI (Load Register Pair Immediate - HL)",
+			input: []byte{0x21, 0x9A, 0xBC}, // LXI H, 0xBC9A
+			initialState: Machine{
+				PC: 0x3000,
+			},
+			expectedState: Machine{
+				PC: 0x3003,
+				Registers: Registers{
+					H: 0xBC,
+					L: 0x9A,
+				},
+			},
+			expectedSize: 3,
+		},
+		{
+			name:  "LXI (Load Stack Pointer Immediate)",
+			input: []byte{0x31, 0xEF, 0xCD}, // LXI SP, 0xCDEF
+			initialState: Machine{
+				PC: 0x4000,
+			},
+			expectedState: Machine{
+				PC: 0x4003,
+				SP: 0xCDEF,
+			},
+			expectedSize: 3,
 		},
 	}
 
