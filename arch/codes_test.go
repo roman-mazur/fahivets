@@ -1161,6 +1161,24 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 			expectedSize: 2,
 		},
 		{
+			name:  "OUT (Output to port)",
+			input: []byte{0xD3, 0x10}, // OUT 0x10
+			initialState: Machine{
+				PC: 0x1000,
+				Registers: Registers{
+					A: 0xAB,
+				},
+			},
+			expectedState: Machine{
+				PC:  0x1002,
+				Out: Ports{0x10: 0xAB},
+				Registers: Registers{
+					A: 0xAB,
+				},
+			},
+			expectedSize: 2,
+		},
+		{
 			name:  "INX H (Increment HL Pair)",
 			input: []byte{0x23}, // INX H
 			initialState: Machine{
@@ -1492,6 +1510,63 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 				},
 			},
 			expectedSize: 2,
+		},
+		{
+			name:  "ORA (Logical OR Accumulator with Register B)",
+			input: []byte{0xB0}, // ORA B
+			initialState: Machine{
+				PC: 0x9000,
+				Registers: Registers{
+					A: 0x0F,
+					B: 0xF0,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x9001,
+				Registers: Registers{
+					A: 0xFF,
+					B: 0xF0,
+				},
+				PSW: PSW{P: true, S: true},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "ORI (Logical OR Accumulator with Immediate)",
+			input: []byte{0xF6, 0x3C}, // ORI 0x3C
+			initialState: Machine{
+				PC: 0xA000,
+				Registers: Registers{
+					A: 0xC3,
+				},
+			},
+			expectedState: Machine{
+				PC: 0xA002,
+				Registers: Registers{
+					A: 0xFF,
+				},
+				PSW: PSW{P: true, S: true},
+			},
+			expectedSize: 2,
+		},
+		{
+			name:  "PCHL (Load HL into PC)",
+			input: []byte{0xE9}, // PCHL
+			initialState: Machine{
+				PC: 0xB000,
+				Registers: Registers{
+					H: 0x12,
+					L: 0x34,
+				},
+			},
+			expectedState: Machine{
+				PC: 0x1234,
+				Registers: Registers{
+					H: 0x12,
+					L: 0x34,
+				},
+			},
+			expectedSize: 1,
 		},
 	}
 

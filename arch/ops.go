@@ -76,6 +76,13 @@ func andA(m *Machine, v byte) {
 	m.PSW.A = false
 }
 
+func orA(m *Machine, v byte) {
+	result := m.Registers.A | v
+	m.Registers.A = result
+	m.setZSPC(int16(result))
+	m.PSW.A = false
+}
+
 // ANA implements the ANA instruction (AND Register or Memory with Accumulator).
 func ANA(r byte) Instruction {
 	return Instruction{
@@ -802,6 +809,49 @@ func MVI(dst byte, data byte) Instruction {
 			} else {
 				*dstR = data
 			}
+		},
+	}
+}
+
+// ORA implements the ORA instruction (Logical OR Register or Memory with Accumulator).
+func ORA(r byte) Instruction {
+	return Instruction{
+		Size: 1,
+		Execute: func(m *Machine) {
+			r, mem := m.selectOperand(r)
+			if mem != nil {
+				orA(m, mem[0])
+			} else {
+				orA(m, *r)
+			}
+		},
+	}
+}
+
+// ORI implements the ORI instruction (Logical OR Immediate with Accumulator).
+func ORI(data byte) Instruction {
+	return Instruction{
+		Size:    2,
+		Execute: func(m *Machine) { orA(m, data) },
+	}
+}
+
+// PCHL implements the PCHL instruction (Load HL into Program Counter).
+func PCHL() Instruction {
+	return Instruction{
+		Size: 1,
+		Execute: func(m *Machine) {
+			m.PC = uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
+		},
+	}
+}
+
+// OUT implements the OUT instruction (Output Accumulator to Port).
+func OUT(port byte) Instruction {
+	return Instruction{
+		Size: 2,
+		Execute: func(m *Machine) {
+			m.Out[port] = m.Registers.A
 		},
 	}
 }

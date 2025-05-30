@@ -45,6 +45,8 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 		return ACI(data[1]), 2, nil
 	case 0xCD:
 		return CALL(nextWord(data)), 3, nil
+	case 0xD3:
+		return OUT(data[1]), 2, nil
 	case 0xD6:
 		return SUI(data[1]), 2, nil
 	case 0xDB:
@@ -55,14 +57,18 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 		return XTHL(), 1, nil
 	case 0xE6:
 		return ANI(data[1]), 2, nil
+	case 0xE9:
+		return PCHL(), 1, nil
 	case 0xEB:
 		return XCHG(), 1, nil
 	case 0xEE:
 		return XRI(data[1]), 2, nil
-	case 0xF9:
-		return SPHL(), 1, nil
 	case 0xF3:
 		return DI(), 1, nil
+	case 0xF6:
+		return ORI(data[1]), 2, nil
+	case 0xF9:
+		return SPHL(), 1, nil
 	case 0xFB:
 		return EI(), 1, nil
 	case 0xFE:
@@ -80,6 +86,10 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 		// And with register.
 		if cmdByte>>3 == 0x14 {
 			return ANA(cmdByte & 0x07), 1, nil
+		}
+		// Or with register.
+		if cmdByte>>3 == 0x16 {
+			return ORA(cmdByte & 0x07), 1, nil
 		}
 		// Conditional call.
 		if cmdByte&0x7 == 0x4 && mask(cmdByte, 0xC0) {
