@@ -1,6 +1,10 @@
 package arch
 
-import "testing"
+import (
+	"reflect"
+	"runtime"
+	"testing"
+)
 
 func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 	is := &InstructionSet{}
@@ -379,7 +383,7 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 		},
 		{
 			name:          "Unknown instruction",
-			input:         []byte{0xFF},
+			input:         []byte{0x08},
 			expectedSize:  0,
 			expectedError: true,
 		},
@@ -845,22 +849,23 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 			expectedSize: 1,
 		},
 		{
-			name:  "SBB B (A = 0x05, B = 0x10, C = 0)",
-			input: []byte{0x98}, // SBB B
+			name:  "SBB L (A = 0x04, L = 0x02, C = 1)",
+			input: []byte{0x9D}, // SBB L
 			initialState: Machine{
 				Registers: Registers{
-					A: 0x05,
-					B: 0x10,
+					A: 0x04,
+					L: 0x02,
 				},
-				PC: 0x1000,
-				SP: 0x2000,
+				PSW: PSW{C: true},
+				PC:  0x1000,
+				SP:  0x2000,
 			},
 			expectedState: Machine{
 				Registers: Registers{
-					A: 0xF5,
-					B: 0x10,
+					A: 0x01,
+					L: 0x02,
 				},
-				PSW: PSW{C: true, S: true, Z: false, P: true, A: true},
+				PSW: PSW{A: true, P: true},
 				PC:  0x1001,
 				SP:  0x2000,
 			},
@@ -894,15 +899,14 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					A: 0x05,
 				},
-				PSW: PSW{C: false},
-				PC:  0x1000,
-				SP:  0x2000,
+				PC: 0x1000,
+				SP: 0x2000,
 			},
 			expectedState: Machine{
 				Registers: Registers{
 					A: 0xF5,
 				},
-				PSW: PSW{C: true, S: true, Z: false, P: false, A: true},
+				PSW: PSW{S: true, P: true},
 				PC:  0x1002,
 				SP:  0x2000,
 			},
@@ -920,10 +924,8 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 				SP:  0x2000,
 			},
 			expectedState: Machine{
-				Registers: Registers{
-					A: 0x00,
-				},
-				PSW: PSW{C: false, S: false, Z: true, P: true, A: false},
+				// Zero registers.
+				PSW: PSW{Z: true, A: true},
 				PC:  0x1002,
 				SP:  0x2000,
 			},
@@ -1084,9 +1086,9 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 			expectedState: Machine{
 				PC: 0x1002,
 				Registers: Registers{
-					A: 0xFF, // A = 0xAA ^ 0x55
+					A: 0xFF,
 				},
-				PSW: PSW{P: true}, // Parity is true (0xFF has an odd number of 1s)
+				PSW: PSW{P: true, S: true},
 			},
 			expectedSize: 2,
 		},
@@ -1102,8 +1104,8 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 			expectedState: Machine{
 				PC:        0x1001,
 				SP:        0x2002,
-				Registers: Registers{H: 0x56, L: 0x78},
-				Memory:    Memory{0x2002: 0x56, 0x2003: 0x78},
+				Registers: Registers{H: 0x78, L: 0x56},
+				Memory:    Memory{0x2002: 0x34, 0x2003: 0x12},
 			},
 			expectedSize: 1,
 		},
@@ -1568,6 +1570,56 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 			},
 			expectedSize: 1,
 		},
+		{
+			name:  "STAX (Store Accumulator in Memory Addressed by BC)",
+			input: []byte{0x02}, // STAX B
+			initialState: Machine{
+				PC: 0xC000,
+				Registers: Registers{
+					A: 0x5A,
+					B: 0x20,
+					C: 0x10,
+				},
+				Memory: Memory{},
+			},
+			expectedState: Machine{
+				PC: 0xC001,
+				Registers: Registers{
+					A: 0x5A,
+					B: 0x20,
+					C: 0x10,
+				},
+				Memory: Memory{
+					0x2010: 0x5A,
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			name:  "STAX (Store Accumulator in Memory Addressed by DE)",
+			input: []byte{0x12}, // STAX D
+			initialState: Machine{
+				PC: 0xC100,
+				Registers: Registers{
+					A: 0x7E,
+					D: 0x30,
+					E: 0x20,
+				},
+				Memory: Memory{},
+			},
+			expectedState: Machine{
+				PC: 0xC101,
+				Registers: Registers{
+					A: 0x7E,
+					D: 0x30,
+					E: 0x20,
+				},
+				Memory: Memory{
+					0x3020: 0x7E,
+				},
+			},
+			expectedSize: 1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1610,4 +1662,48 @@ type testWriter testing.T
 func (tw *testWriter) Write(p []byte) (n int, err error) {
 	tw.Logf("%s", string(p))
 	return len(p), nil
+}
+
+func TestAllInstructions(t *testing.T) {
+	var is InstructionSet
+
+	data := [3]byte{0, 1, 2}
+	invalid := [256]bool{
+		0x08: true,
+		0x10: true,
+		0x18: true,
+		0x20: true,
+		0x28: true,
+		0x30: true,
+		0x38: true,
+		0xCB: true,
+		0xD9: true,
+		0xDD: true,
+		0xED: true,
+		0xFD: true,
+	}
+
+	for i := range 256 {
+		data[0] = byte(i)
+		cmd, n, err := is.DecodeBytes(data[:])
+		if invalid[i] {
+			if err == nil {
+				name := runtime.FuncForPC(reflect.ValueOf(cmd.Execute).Pointer()).Name()
+				t.Errorf("expected error decoding instruction %02x, got %d bytes %s", i, n, name)
+			}
+			continue
+		}
+
+		if err != nil {
+			t.Errorf("error decoding instruction %02x: %s", i, err)
+			continue
+		}
+
+		if n < 1 || n > 3 {
+			t.Errorf("invalid instruction size for %02x: %d", i, n)
+		}
+		if cmd.Execute == nil {
+			t.Errorf("no exec func for %02x", i)
+		}
+	}
 }

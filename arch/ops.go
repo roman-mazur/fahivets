@@ -16,23 +16,30 @@ func ref8(r *byte, mem []byte) *byte {
 	return &mem[0]
 }
 
-func lookup16(r1, r2 *byte, sp *uint16) int16 {
+func lookup32(r1, r2 *byte, sp *uint16) int32 {
 	if sp != nil {
-		return int16(*sp)
+		return int32(*sp)
 	}
-	return int16(*r1)<<8 | int16(*r2)
+	return int32(*r1)<<8 | int32(*r2)
 }
 
 func addDst(m *Machine, reg *byte, v int16, doCarry bool) {
 	carry := int16(0)
 	if doCarry && m.PSW.C {
 		carry = 1
+		if v < 0 {
+			carry = -1
+		}
 	}
 	v0 := int16(*reg)
 	sum := v0 + v + carry
 	*reg = byte(sum & 0xFF)
 	m.setZSPC(sum)
-	m.setAddA(v0, v, carry)
+	if v >= 0 {
+		m.setAddA(v0, v, carry)
+	} else {
+		m.setSubA(v0, -v, carry)
+	}
 }
 
 func incA(m *Machine, v int16, doCarry bool) { addDst(m, &m.Registers.A, v, doCarry) }
@@ -218,10 +225,10 @@ func DAD(rp byte) Instruction {
 	return Instruction{
 		Size: 1,
 		Execute: func(m *Machine) {
-			v1 := lookup16(m.selectDoubleOperand(2)) // HL registers.
-			v2 := lookup16(m.selectDoubleOperand(rp))
+			v1 := lookup32(m.selectDoubleOperand(2)) // HL registers.
+			v2 := lookup32(m.selectDoubleOperand(rp))
 
-			res := storeDoubleAdd(m, &m.Registers.H, &m.Registers.L, int32(v1), int32(v2))
+			res := storeDoubleAdd(m, &m.Registers.H, &m.Registers.L, v1, v2)
 			m.PSW.C = res > 0xFFFF
 		},
 	}
@@ -421,37 +428,14 @@ func SBB(r byte) Instruction {
 	return Instruction{
 		Size: 1,
 		Execute: func(m *Machine) {
-			var operand byte
-			switch r {
-			case 0:
-				operand = m.Registers.B
-			case 1:
-				operand = m.Registers.C
-			case 2:
-				operand = m.Registers.D
-			case 3:
-				operand = m.Registers.E
-			case 4:
-				operand = m.Registers.H
-			case 5:
-				operand = m.Registers.L
-			case 6:
-				addr := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
-				operand = m.Memory[addr]
-			case 7:
-				operand = m.Registers.A
+			reg, mem := m.selectOperand(r)
+			var val int16
+			if mem != nil {
+				val = int16(mem[0])
+			} else {
+				val = int16(*reg)
 			}
-
-			borrow := int16(0)
-			if m.PSW.C {
-				borrow = 1
-			}
-
-			sum := uint16(m.Registers.A) - uint16(operand) - uint16(borrow)
-			m.setSubA(int16(m.Registers.A), int16(operand), borrow)
-			m.Registers.A = byte(sum & 0xFF)
-			m.setZSPC(int16(sum & 0xFF))
-			m.PSW.C = sum > 0xFF
+			addDst(m, &m.Registers.A, -val, true)
 		},
 	}
 }
@@ -461,15 +445,7 @@ func SBI(data byte) Instruction {
 	return Instruction{
 		Size: 2,
 		Execute: func(m *Machine) {
-			borrow := int16(0)
-			if m.PSW.C {
-				borrow = 1
-			}
-			sum := uint16(m.Registers.A) - uint16(data) - uint16(borrow)
-			m.setSubA(int16(m.Registers.A), int16(data), borrow)
-			m.Registers.A = byte(sum & 0xFF)
-			m.setZSPC(int16(sum & 0xFF))
-			m.PSW.C = sum > 0xFF
+			addDst(m, &m.Registers.A, -int16(data), true)
 		},
 	}
 }
@@ -506,18 +482,15 @@ func STA(addr uint16) Instruction {
 }
 
 // STAX implements the STAX instruction (Store Accumulator Indirectly).
-func STAX(r byte) Instruction {
+func STAX(rp byte) Instruction {
 	return Instruction{
 		Size: 1,
 		Execute: func(m *Machine) {
-			var addr uint16
-			switch r {
-			case 0: // B and C
-				addr = uint16(m.Registers.B)<<8 | uint16(m.Registers.C)
-			case 1: // D and E
-				addr = uint16(m.Registers.D)<<8 | uint16(m.Registers.E)
+			h, l, sp := m.selectDoubleOperand(rp)
+			if sp != nil {
+				panic("STAX with SP")
 			}
-			m.Memory[addr] = m.Registers.A
+			m.Memory[uint16(*h)<<8|uint16(*l)] = m.Registers.A
 		},
 	}
 }

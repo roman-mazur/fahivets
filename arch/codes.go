@@ -102,12 +102,12 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 			return CMP(r), 1, nil
 		}
 		// DAD.
-		if cmdByte&0x0F == 0x09 && !mask(cmdByte, 0xC0) {
+		if cmdByte&0x0F == 0x09 && cmdByte>>6 == 0 {
 			rp := (cmdByte & 0x30) >> 4
 			return DAD(rp), 1, nil
 		}
 		// Decrements.
-		if !mask(cmdByte, 0xC0) {
+		if cmdByte>>6 == 0 {
 			if cmdByte&0x07 == 0x05 {
 				r := cmdByte & 0x38 >> 3
 				return DCR(r), 1, nil
@@ -127,7 +127,7 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 				return PUSH(rp), 1, nil
 			}
 			// Conditional return.
-			cnd := (cmdByte & 0x38) >> 3
+			cnd := (cmdByte >> 3) & 0x07
 			if cmdByte&0x07 == 0 {
 				return Rcnd(cnd), 1, nil
 			}
@@ -136,7 +136,7 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 				return RST(cnd), 1, nil
 			}
 			// Conditional jump.
-			if cmdByte&0x07 == 0x20 {
+			if cmdByte&0x07 == 0x02 {
 				return JCnd(cnd, nextWord(data)), 3, nil
 			}
 		}
@@ -156,7 +156,7 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 		}
 
 		// Increments.
-		if !mask(cmdByte, 0xC0) {
+		if cmdByte>>6 == 0 {
 			if cmdByte&0x07 == 0x04 {
 				r := cmdByte & 0x38 >> 3
 				return INR(r), 1, nil
@@ -175,6 +175,12 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 			return LXI(rp, nextWord(data)), 3, nil
 		}
 
+		// Store.
+		if cmdByte&0x0F == 0x02 && cmdByte>>6 == 0 {
+			rp := cmdByte >> 4 & 0x03
+			return STAX(rp), 1, nil
+		}
+
 		// Move.
 		switch sel := cmdByte >> 6; sel {
 		case 0:
@@ -185,7 +191,7 @@ func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
 			return MOV(cmdByte>>3&0x07, cmdByte&0x07), 1, nil
 		}
 
-		return Instruction{}, 0, fmt.Errorf("unknown instruction 0x%02x", data[0])
+		return Instruction{}, 0, fmt.Errorf("unknown instruction 0x%02x (%#b)", data[0], data[0])
 	}
 }
 
