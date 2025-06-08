@@ -47,6 +47,7 @@ func incA(m *Machine, v int16, doCarry bool) { addDst(m, &m.Registers.A, v, doCa
 // ACI implements the ACI instruction (Add to Accumulator with Carry).
 func ACI(data byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("ACI 0x%02x", data),
 		Size:    2,
 		Execute: func(m *Machine) { incA(m, int16(data), true) },
 	}
@@ -55,6 +56,7 @@ func ACI(data byte) Instruction {
 // ADC implements the ADC instruction (Add Register or Memory to Accumulator with Carry).
 func ADC(r byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("ADC %s", RegisterCode(r)),
 		Size:    1,
 		Execute: func(m *Machine) { incA(m, lookup8(m.selectOperand(r)), true) },
 	}
@@ -63,6 +65,7 @@ func ADC(r byte) Instruction {
 // ADD implements the ADD instruction (Add Register or Memory to Accumulator).
 func ADD(r byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("ADD %s", RegisterCode(r)),
 		Size:    1,
 		Execute: func(m *Machine) { incA(m, lookup8(m.selectOperand(r)), false) },
 	}
@@ -71,6 +74,7 @@ func ADD(r byte) Instruction {
 // ADI implements the ADI instruction (Add Immediate to Accumulator).
 func ADI(data byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("ADI 0x%02x", data),
 		Size:    2,
 		Execute: func(m *Machine) { incA(m, int16(data), false) },
 	}
@@ -93,6 +97,7 @@ func orA(m *Machine, v byte) {
 // ANA implements the ANA instruction (AND Register or Memory with Accumulator).
 func ANA(r byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("ANA %s", RegisterCode(r)),
 		Size:    1,
 		Execute: func(m *Machine) { andA(m, byte(lookup8(m.selectOperand(r)))) },
 	}
@@ -101,6 +106,7 @@ func ANA(r byte) Instruction {
 // ANI implements the ANI instruction (AND Immediate with Accumulator).
 func ANI(data byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("ANI 0x%02x", data),
 		Size:    2,
 		Execute: func(m *Machine) { andA(m, data) },
 	}
@@ -109,6 +115,7 @@ func ANI(data byte) Instruction {
 // CALL implements the CALL instruction (Call subroutine).
 func CALL(addr uint16) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("ANI 0x%04x", addr),
 		Size: 3,
 		Execute: func(m *Machine) {
 			m.push16(m.PC + 3) // Push return address
@@ -117,32 +124,12 @@ func CALL(addr uint16) Instruction {
 	}
 }
 
-func condition(cnd byte) func(*Machine) bool {
-	switch cnd {
-	case 0:
-		return func(m *Machine) bool { return !m.PSW.Z }
-	case 1:
-		return func(m *Machine) bool { return m.PSW.Z }
-	case 2:
-		return func(m *Machine) bool { return !m.PSW.C }
-	case 3:
-		return func(m *Machine) bool { return m.PSW.C }
-	case 4:
-		return func(m *Machine) bool { return !m.PSW.P }
-	case 5:
-		return func(m *Machine) bool { return m.PSW.P }
-	case 6:
-		return func(m *Machine) bool { return !m.PSW.S }
-	case 7:
-		return func(m *Machine) bool { return m.PSW.S }
-	default:
-		panic(fmt.Errorf("invalid condition: 0x%02x", cnd))
-	}
-}
+func condition(cnd byte) func(*Machine) bool { return ConditionCode(cnd).Check }
 
 // Ccnd implements the conditional CALL instruction.
 func Ccnd(cnd byte, addr uint16) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("Ccnd %s 0x%04x", ConditionCode(cnd), addr),
 		Size: 3,
 		Execute: func(m *Machine) {
 			if condition(cnd)(m) {
@@ -156,6 +143,7 @@ func Ccnd(cnd byte, addr uint16) Instruction {
 // CMA implements the CMA instruction (Complement Accumulator).
 func CMA() Instruction {
 	return Instruction{
+		Name: "CMA",
 		Size: 1,
 		Execute: func(m *Machine) {
 			m.Registers.A = ^m.Registers.A
@@ -166,6 +154,7 @@ func CMA() Instruction {
 // CMC implements the CMC instruction (Complement Carry).
 func CMC() Instruction {
 	return Instruction{
+		Name: "CMC",
 		Size: 1,
 		Execute: func(m *Machine) {
 			m.PSW.C = !m.PSW.C
@@ -183,6 +172,7 @@ func cmpA(m *Machine, v int16) {
 // CMP implements the CMP instruction (Compare Register or Memory with Accumulator).
 func CMP(r byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("CMP %s", RegisterCode(r)),
 		Size:    1,
 		Execute: func(m *Machine) { cmpA(m, lookup8(m.selectOperand(r))) },
 	}
@@ -191,6 +181,7 @@ func CMP(r byte) Instruction {
 // CPI implements the CPI instruction (Compare Immediate with Accumulator).
 func CPI(data byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("CPI 0x%02x", data),
 		Size:    2,
 		Execute: func(m *Machine) { cmpA(m, int16(data)) },
 	}
@@ -199,6 +190,7 @@ func CPI(data byte) Instruction {
 // DAA implements the DAA instruction (Decimal Adjust Accumulator).
 func DAA() Instruction {
 	return Instruction{
+		Name: "DAA",
 		Size: 1,
 		Execute: func(m *Machine) {
 			if (m.Registers.A&0x0F) > 9 || m.PSW.A {
@@ -223,6 +215,7 @@ func storeDoubleAdd(m *Machine, h, l *byte, v1, v2 int32) int32 {
 // DAD implements the DAD instruction (Double Add).
 func DAD(rp byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("DAD %s", RegisterPairCode(rp)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			v1 := lookup32(m.selectDoubleOperand(2)) // HL registers.
@@ -237,6 +230,7 @@ func DAD(rp byte) Instruction {
 // DCR implements the DCR instruction (Decrement Register or Memory).
 func DCR(r byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("DCR %s", RegisterCode(r)),
 		Size:    1,
 		Execute: func(m *Machine) { addDst(m, ref8(m.selectOperand(r)), -1, false) },
 	}
@@ -245,28 +239,18 @@ func DCR(r byte) Instruction {
 // DCX implements the DCX instruction (Decrement Register Pair).
 func DCX(rp byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("DCX %s", RegisterPairCode(rp)),
 		Size: 1,
 		Execute: func(m *Machine) {
-
-			switch rp {
-			case 0: // B and C
-				BC := uint16(m.Registers.B)<<8 | uint16(m.Registers.C)
-				BC--
-				m.Registers.B = byte((BC >> 8) & 0xFF)
-				m.Registers.C = byte(BC & 0xFF)
-			case 1: // D and E
-				DE := uint16(m.Registers.D)<<8 | uint16(m.Registers.E)
-				DE--
-				m.Registers.D = byte((DE >> 8) & 0xFF)
-				m.Registers.E = byte(DE & 0xFF)
-			case 2: // H and L
-				HL := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
-				HL--
-				m.Registers.H = byte((HL >> 8) & 0xFF)
-				m.Registers.L = byte(HL & 0xFF)
-			case 3: // SP
-				m.SP--
+			h, l, sp := m.selectDoubleOperand(rp)
+			if sp != nil {
+				*sp--
+				return
 			}
+			v := uint16(*h)<<8 | uint16(*l)
+			v--
+			*h = byte((v >> 8) & 0xFF)
+			*l = byte(v & 0xFF)
 		},
 	}
 }
@@ -274,6 +258,7 @@ func DCX(rp byte) Instruction {
 // LXI implements the LXI instruction (Load Register Pair Immediate).
 func LXI(rp byte, data uint16) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("LXI %s 0x%04x", RegisterPairCode(rp), data),
 		Size: 3,
 		Execute: func(m *Machine) {
 			h, l, sp := m.selectDoubleOperand(rp)
@@ -290,6 +275,7 @@ func LXI(rp byte, data uint16) Instruction {
 // POP implements the POP instruction (Pop Data onto Register Pair)
 func POP(rp byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("POP %s", RegisterPairCode(rp)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			h, l, sp := m.selectDoubleOperand(rp)
@@ -310,6 +296,7 @@ func POP(rp byte) Instruction {
 // PUSH implements the PUSH instruction (Push Register Pair onto Stack)
 func PUSH(rp byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("PUSH %s", RegisterPairCode(rp)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			var (
@@ -333,6 +320,7 @@ func PUSH(rp byte) Instruction {
 // RAL implements the RAL instruction (Rotate Accumulator Left through Carry)
 func RAL() Instruction {
 	return Instruction{
+		Name: "RAL",
 		Size: 1,
 		Execute: func(m *Machine) {
 			carry := byte(0)
@@ -348,6 +336,7 @@ func RAL() Instruction {
 // RAR implements the RAR instruction (Rotate Accumulator Right through Carry)
 func RAR() Instruction {
 	return Instruction{
+		Name: "RAR",
 		Size: 1,
 		Execute: func(m *Machine) {
 			c := byte(0)
@@ -363,6 +352,7 @@ func RAR() Instruction {
 // STC implements the STC instruction (Set Carry)
 func STC() Instruction {
 	return Instruction{
+		Name:    "STC",
 		Size:    1,
 		Execute: func(m *Machine) { m.PSW.C = true },
 	}
@@ -371,6 +361,7 @@ func STC() Instruction {
 // RLC implements the RLC instruction (Rotate Accumulator Left)
 func RLC() Instruction {
 	return Instruction{
+		Name: "RLC",
 		Size: 1,
 		Execute: func(m *Machine) {
 			carry := m.Registers.A >> 7
@@ -383,6 +374,7 @@ func RLC() Instruction {
 // RRC implements the RRC instruction (Rotate Accumulator Right)
 func RRC() Instruction {
 	return Instruction{
+		Name: "RRC",
 		Size: 1,
 		Execute: func(m *Machine) {
 			carry := m.Registers.A & 0x01
@@ -395,6 +387,7 @@ func RRC() Instruction {
 // Rcnd implements the conditional return instruction.
 func Rcnd(cnd byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("Rcnd %s", ConditionCode(cnd)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			if condition(cnd)(m) {
@@ -407,6 +400,7 @@ func Rcnd(cnd byte) Instruction {
 // RET implements the RET instruction (Return from subroutine).
 func RET() Instruction {
 	return Instruction{
+		Name:    "RET",
 		Size:    1,
 		Execute: func(m *Machine) { m.PC = m.pop16() },
 	}
@@ -415,6 +409,7 @@ func RET() Instruction {
 // RST implements the RST instruction (Restart).
 func RST(n byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("RST %d", n),
 		Size: 1,
 		Execute: func(m *Machine) {
 			m.push16(m.PC + 1)
@@ -426,6 +421,7 @@ func RST(n byte) Instruction {
 // SBB implements the SBB instruction (Subtract Register or Memory from Accumulator with Borrow).
 func SBB(r byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("SBB %s", RegisterCode(r)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			reg, mem := m.selectOperand(r)
@@ -443,6 +439,7 @@ func SBB(r byte) Instruction {
 // SBI implements the SBI instruction (Subtract Immediate from Accumulator with Borrow).
 func SBI(data byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("SBI 0x%02x", data),
 		Size: 2,
 		Execute: func(m *Machine) {
 			addDst(m, &m.Registers.A, -int16(data), true)
@@ -453,6 +450,7 @@ func SBI(data byte) Instruction {
 // SHLD implements the SHLD instruction (Store H and L Directly).
 func SHLD(addr uint16) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("SHLD 0x%04x", addr),
 		Size: 3,
 		Execute: func(m *Machine) {
 			m.Memory[addr] = m.Registers.L
@@ -464,6 +462,7 @@ func SHLD(addr uint16) Instruction {
 // SPHL implements the SPHL instruction (Move HL to SP).
 func SPHL() Instruction {
 	return Instruction{
+		Name: "SPHL",
 		Size: 1,
 		Execute: func(m *Machine) {
 			m.SP = uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
@@ -474,6 +473,7 @@ func SPHL() Instruction {
 // STA implements the STA instruction (Store Accumulator Directly).
 func STA(addr uint16) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("STA 0x%04x", addr),
 		Size: 3,
 		Execute: func(m *Machine) {
 			m.Memory[addr] = m.Registers.A
@@ -484,6 +484,7 @@ func STA(addr uint16) Instruction {
 // STAX implements the STAX instruction (Store Accumulator Indirectly).
 func STAX(rp byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("STAX %s", RegisterPairCode(rp)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			h, l, sp := m.selectDoubleOperand(rp)
@@ -498,33 +499,11 @@ func STAX(rp byte) Instruction {
 // SUB implements the SUB instruction (Subtract Register or Memory from Accumulator).
 func SUB(r byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("SUB %s", RegisterCode(r)),
 		Size: 1,
 		Execute: func(m *Machine) {
-			var operand byte
-			switch r {
-			case 0:
-				operand = m.Registers.B
-			case 1:
-				operand = m.Registers.C
-			case 2:
-				operand = m.Registers.D
-			case 3:
-				operand = m.Registers.E
-			case 4:
-				operand = m.Registers.H
-			case 5:
-				operand = m.Registers.L
-			case 6:
-				addr := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
-				operand = m.Memory[addr]
-			case 7:
-				operand = m.Registers.A
-			}
-			sum := uint16(m.Registers.A) - uint16(operand)
-			m.setSubA(int16(m.Registers.A), int16(operand), 0)
-			m.Registers.A = byte(sum & 0xFF)
-			m.setZSPC(int16(sum & 0xFF))
-			m.PSW.C = sum > 0xFF
+			val := lookup8(m.selectOperand(r))
+			addDst(m, &m.Registers.A, -val, false)
 		},
 	}
 }
@@ -532,20 +511,16 @@ func SUB(r byte) Instruction {
 // SUI implements the SUI instruction (Subtract Immediate from Accumulator).
 func SUI(data byte) Instruction {
 	return Instruction{
-		Size: 2,
-		Execute: func(m *Machine) {
-			sum := uint16(m.Registers.A) - uint16(data)
-			m.setSubA(int16(m.Registers.A), int16(data), 0)
-			m.Registers.A = byte(sum & 0xFF)
-			m.setZSPC(int16(sum & 0xFF))
-			m.PSW.C = sum > 0xFF
-		},
+		Name:    fmt.Sprintf("SUI 0x%02x", data),
+		Size:    2,
+		Execute: func(m *Machine) { addDst(m, &m.Registers.A, -int16(data), false) },
 	}
 }
 
 // XCHG implements the XCHG instruction (Exchange H&L with D&E).
 func XCHG() Instruction {
 	return Instruction{
+		Name: "XCHG",
 		Size: 1,
 		Execute: func(m *Machine) {
 			m.Registers.H, m.Registers.D = m.Registers.D, m.Registers.H
@@ -557,6 +532,7 @@ func XCHG() Instruction {
 // XTHL implements the XTHL instruction (Exchange Top of Stack with H and L).
 func XTHL() Instruction {
 	return Instruction{
+		Name: "XTHL",
 		Size: 1,
 		Execute: func(m *Machine) {
 			top := m.Memory[m.SP]
@@ -570,6 +546,7 @@ func XTHL() Instruction {
 // XRI implements the XRI instruction (Exclusive OR Immediate with Accumulator).
 func XRI(data byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("XRI 0x%02x", data),
 		Size: 2,
 		Execute: func(m *Machine) {
 			m.Registers.A ^= data
@@ -582,29 +559,10 @@ func XRI(data byte) Instruction {
 // XRA implements the XRA instruction (Exclusive OR Register or Memory with Accumulator).
 func XRA(r byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("XRA %s", RegisterCode(r)),
 		Size: 1,
 		Execute: func(m *Machine) {
-			var operand byte
-			switch r {
-			case 0:
-				operand = m.Registers.B
-			case 1:
-				operand = m.Registers.C
-			case 2:
-				operand = m.Registers.D
-			case 3:
-				operand = m.Registers.E
-			case 4:
-				operand = m.Registers.H
-			case 5:
-				operand = m.Registers.L
-			case 6:
-				addr := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
-				operand = m.Memory[addr]
-			case 7:
-				operand = m.Registers.A
-			}
-			m.Registers.A ^= operand
+			m.Registers.A ^= byte(lookup8(m.selectOperand(r)))
 			m.setZSPC(int16(m.Registers.A))
 			m.PSW.C = false
 		},
@@ -614,6 +572,7 @@ func XRA(r byte) Instruction {
 // LHLD implements the LHLD instruction (Load H and L Directly).
 func LHLD(addr uint16) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("LHLD 0x%04x", addr),
 		Size: 3,
 		Execute: func(m *Machine) {
 			m.Registers.L = m.Memory[addr]
@@ -625,6 +584,7 @@ func LHLD(addr uint16) Instruction {
 // INR implements the INR instruction (Increment Register or Memory).
 func INR(r byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("INR %s", RegisterCode(r)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			reg, mem := m.selectOperand(r)
@@ -640,6 +600,7 @@ func INR(r byte) Instruction {
 // INX implements the INX instruction (Increment Register Pair).
 func INX(rp byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("INX %s", RegisterPairCode(rp)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			h, l, sp := m.selectDoubleOperand(rp)
@@ -655,16 +616,16 @@ func INX(rp byte) Instruction {
 // LDA implements the LDA instruction (Load Accumulator Directly).
 func LDA(addr uint16) Instruction {
 	return Instruction{
-		Size: 3,
-		Execute: func(m *Machine) {
-			m.Registers.A = m.Memory[addr]
-		},
+		Name:    fmt.Sprintf("LDA 0x%04x", addr),
+		Size:    3,
+		Execute: func(m *Machine) { m.Registers.A = m.Memory[addr] },
 	}
 }
 
 // LDAX implements the LDAX instruction (Load Accumulator Indirectly from Register Pair).
 func LDAX(rp byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("LDAX %s", RegisterPairCode(rp)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			h, l, sp := m.selectDoubleOperand(rp)
@@ -679,6 +640,7 @@ func LDAX(rp byte) Instruction {
 // JMP implements the JMP instruction (Jump Unconditionally).
 func JMP(addr uint16) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("JMP 0x%04x", addr),
 		Size:    3,
 		Execute: func(m *Machine) { m.PC = addr },
 	}
@@ -686,6 +648,7 @@ func JMP(addr uint16) Instruction {
 
 func JCnd(cnd byte, addr uint16) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("JCnd %s 0x%04x", ConditionCode(cnd), addr),
 		Size: 3,
 		Execute: func(m *Machine) {
 			if condition(cnd)(m) {
@@ -695,23 +658,9 @@ func JCnd(cnd byte, addr uint16) Instruction {
 	}
 }
 
-// CZ implements the CZ instruction (Call if Zero Flag is Set).
-func CZ(addr uint16) Instruction {
-	return Instruction{
-		Size: 3,
-		Execute: func(m *Machine) {
-			if m.PSW.Z {
-				m.Memory[m.SP-1] = byte((m.PC >> 8) & 0xFF) // Store high byte of PC
-				m.Memory[m.SP-2] = byte(m.PC & 0xFF)        // Store low byte of PC
-				m.SP -= 2                                   // Update SP
-				m.PC = addr                                 // Jump to the address
-			}
-		},
-	}
-}
-
 func NOP() Instruction {
 	return Instruction{
+		Name:    "NOP",
 		Size:    1,
 		Execute: func(m *Machine) {},
 	}
@@ -720,6 +669,7 @@ func NOP() Instruction {
 // EI implements the EI instruction (Enable Interrupts).
 func EI() Instruction {
 	return Instruction{
+		Name:    "EI",
 		Size:    1,
 		Execute: func(m *Machine) { m.Interrupts = true },
 	}
@@ -728,6 +678,7 @@ func EI() Instruction {
 // DI implements the DI instruction (Disable Interrupts).
 func DI() Instruction {
 	return Instruction{
+		Name:    "DI",
 		Size:    1,
 		Execute: func(m *Machine) { m.Interrupts = false },
 	}
@@ -736,6 +687,7 @@ func DI() Instruction {
 // HLT implements the HLT instruction (Halt Execution).
 func HLT() Instruction {
 	return Instruction{
+		Name:    "HLT",
 		Size:    1,
 		Execute: func(m *Machine) { m.PC = 0 },
 	}
@@ -744,6 +696,7 @@ func HLT() Instruction {
 // IN implements the IN instruction (Input from Port to Accumulator).
 func IN(port byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("IN 0x%02x", port),
 		Size:    2,
 		Execute: func(m *Machine) { m.Registers.A = m.In[port] },
 	}
@@ -752,6 +705,7 @@ func IN(port byte) Instruction {
 // MOV implements the MOV instruction (Move Data from Source to Destination Register or Memory).
 func MOV(dst byte, src byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("MOV %s, %s", RegisterCode(dst), RegisterCode(src)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			srcR, srcMem := m.selectOperand(src)
@@ -774,6 +728,7 @@ func MOV(dst byte, src byte) Instruction {
 // MVI implements the MVI instruction (Move Immediate to Register or Memory).
 func MVI(dst byte, data byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("MVI %s, 0x%02x", RegisterCode(dst), data),
 		Size: 2,
 		Execute: func(m *Machine) {
 			dstR, dstMem := m.selectOperand(dst)
@@ -789,6 +744,7 @@ func MVI(dst byte, data byte) Instruction {
 // ORA implements the ORA instruction (Logical OR Register or Memory with Accumulator).
 func ORA(r byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("ORA %s", RegisterCode(r)),
 		Size: 1,
 		Execute: func(m *Machine) {
 			r, mem := m.selectOperand(r)
@@ -804,6 +760,7 @@ func ORA(r byte) Instruction {
 // ORI implements the ORI instruction (Logical OR Immediate with Accumulator).
 func ORI(data byte) Instruction {
 	return Instruction{
+		Name:    fmt.Sprintf("ORI 0x%02x", data),
 		Size:    2,
 		Execute: func(m *Machine) { orA(m, data) },
 	}
@@ -812,6 +769,7 @@ func ORI(data byte) Instruction {
 // PCHL implements the PCHL instruction (Load HL into Program Counter).
 func PCHL() Instruction {
 	return Instruction{
+		Name: "PCHL",
 		Size: 1,
 		Execute: func(m *Machine) {
 			m.PC = uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
@@ -822,6 +780,7 @@ func PCHL() Instruction {
 // OUT implements the OUT instruction (Output Accumulator to Port).
 func OUT(port byte) Instruction {
 	return Instruction{
+		Name: fmt.Sprintf("OUT 0x%02x", port),
 		Size: 2,
 		Execute: func(m *Machine) {
 			m.Out[port] = m.Registers.A

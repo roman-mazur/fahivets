@@ -31,6 +31,28 @@ func (m *Memory) DumpSparse(out io.Writer) error {
 	return nil
 }
 
+func (m *Memory) Dump(out io.Writer, start, end int) error {
+	for i := start; i < end; i++ {
+		if (i-start)%16 == 0 {
+			_, err := fmt.Fprintf(out, "\n%04x:", i)
+			if err != nil {
+				return err
+			}
+		}
+		_, err := fmt.Fprintf(out, " %02x", m[i])
+		if err != nil {
+			return err
+		}
+		if (i-start)%16 == 15 {
+			_, err := fmt.Fprintf(out, "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 type Ports [256]byte
 
 type Machine struct {
@@ -56,6 +78,15 @@ func (m *Machine) Exec(ins Instruction) {
 	if pc == m.PC {
 		m.PC += uint16(ins.Size)
 	}
+}
+
+func (m *Machine) Step() (Instruction, error) {
+	cmd, _, err := DecodeBytes(m.Memory[m.PC:])
+	if err != nil {
+		return cmd, err
+	}
+	m.Exec(cmd)
+	return cmd, nil
 }
 
 func (m *Machine) psw() byte {
@@ -175,6 +206,49 @@ func (m *Machine) pop16() uint16 {
 }
 
 type Instruction struct {
+	Name    string
 	Size    byte
 	Execute func(m *Machine)
 }
+
+type RegisterCode byte
+
+func (rc RegisterCode) String() string { return registerNames[rc : rc+1] }
+
+type RegisterPairCode byte
+
+func (rpc RegisterPairCode) String() string { return pairNames[rpc] }
+
+type ConditionCode byte
+
+func (cc ConditionCode) String() string { return conditionNames[cc : cc+1] }
+
+func (cc ConditionCode) Check(m *Machine) bool {
+	switch cc {
+	case 0:
+		return !m.PSW.Z
+	case 1:
+		return m.PSW.Z
+	case 2:
+		return !m.PSW.C
+	case 3:
+		return m.PSW.C
+	case 4:
+		return !m.PSW.P
+	case 5:
+		return m.PSW.P
+	case 6:
+		return !m.PSW.S
+	case 7:
+		return m.PSW.S
+	default:
+		panic(fmt.Errorf("invalid condition: 0x%02x", cc))
+	}
+}
+
+const (
+	registerNames  = "BCDEHLMA"
+	conditionNames = "ZzCcPpSs"
+)
+
+var pairNames = [4]string{"BC", "DE", "HL", "SP"}

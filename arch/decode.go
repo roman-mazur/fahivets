@@ -2,10 +2,26 @@ package arch
 
 import "fmt"
 
-type InstructionSet struct {
+func DecodeAllBytes(data []byte) (res []Instruction, err error) {
+	l := 0
+	for len(data) > 0 {
+		var (
+			ins Instruction
+			n   int
+		)
+		ins, n, err = DecodeBytes(data)
+		if err != nil {
+			err = fmt.Errorf("failed to decode instruction at pos %#x: %w", l, err)
+			return
+		}
+		data = data[n:]
+		l += n
+		res = append(res, ins)
+	}
+	return
 }
 
-func (is *InstructionSet) DecodeBytes(data []byte) (Instruction, int, error) {
+func DecodeBytes(data []byte) (Instruction, int, error) {
 	switch cmdByte := data[0]; cmdByte {
 	case 0x00:
 		return NOP(), 1, nil

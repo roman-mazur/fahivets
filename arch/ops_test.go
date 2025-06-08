@@ -425,16 +425,3 @@ func TestJMP(t *testing.T) {
 		t.Errorf("JMP: PC = %X, want PC to be %X", m.PC, targetAddr)
 	}
 }
-
-func TestCZ(t *testing.T) {
-	var m Machine
-	m.PSW.Z = true
-	m.PC = 0x1234
-	callAddr := uint16(0x3456)
-
-	CZ(callAddr).Execute(&m)
-
-	if m.PSW.Z && m.PC != callAddr {
-		t.Errorf("CZ: PC = %X, want PC = %X (when Zero flag is set)", m.PC, callAddr)
-	}
-}

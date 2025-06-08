@@ -1,14 +1,13 @@
 package arch
 
 import (
+	"bytes"
 	"reflect"
 	"runtime"
 	"testing"
 )
 
-func TestInstructionSet_DecodeAndExecute(t *testing.T) {
-	is := &InstructionSet{}
-
+func TestDecodeAndExecute(t *testing.T) {
 	testCases := []struct {
 		name          string
 		input         []byte
@@ -1626,7 +1625,7 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := tc.initialState
 
-			instruction, size, err := is.DecodeBytes(tc.input)
+			instruction, size, err := DecodeBytes(tc.input)
 
 			if err != nil {
 				t.Logf("error: %s", err)
@@ -1654,23 +1653,43 @@ func TestInstructionSet_DecodeAndExecute(t *testing.T) {
 func dumpMemory(t *testing.T, m *Machine) {
 	t.Helper()
 	t.Log("memory:")
-	_ = m.Memory.DumpSparse((*testWriter)(t))
+	_ = m.Memory.DumpSparse(newTestWriter(t))
 }
 
-type testWriter testing.T
+type testWriter struct {
+	t   *testing.T
+	buf bytes.Buffer
+}
 
 func (tw *testWriter) Write(p []byte) (n int, err error) {
-	tw.Logf("%s", string(p))
+	if i := bytes.IndexByte(p, '\n'); i != -1 {
+		tw.buf.Write(p[:i])
+		if tw.buf.Len() > 0 {
+			tw.t.Logf("%s", tw.buf.String())
+			tw.buf.Reset()
+		}
+		tw.buf.Write(p[i+1:])
+	} else {
+		tw.buf.Write(p)
+	}
 	return len(p), nil
 }
 
-func TestAllInstructions(t *testing.T) {
-	var is InstructionSet
+func newTestWriter(t *testing.T) *testWriter {
+	res := &testWriter{t: t}
+	t.Cleanup(func() {
+		if res.buf.Len() > 0 {
+			res.t.Logf("%s", res.buf.String())
+		}
+	})
+	return res
+}
 
+func TestAllInstructions(t *testing.T) {
 	data := [3]byte{0, 1, 2}
 	invalid := [256]bool{
 		0x08: true,
-		0x10: true,
+		0x10: true, // TODO: Currently noticed in the monitor program.
 		0x18: true,
 		0x20: true,
 		0x28: true,
@@ -1685,7 +1704,7 @@ func TestAllInstructions(t *testing.T) {
 
 	for i := range 256 {
 		data[0] = byte(i)
-		cmd, n, err := is.DecodeBytes(data[:])
+		cmd, n, err := DecodeBytes(data[:])
 		if invalid[i] {
 			if err == nil {
 				name := runtime.FuncForPC(reflect.ValueOf(cmd.Execute).Pointer()).Name()
