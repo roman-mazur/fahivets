@@ -120,6 +120,16 @@ func (m *CPU) setZSPC(v int16) {
 	m.PSW.C = v < -0xFF || v > 0xFF
 }
 
+// Register selectors:
+//
+//	111=A
+//	000=B
+//	001=C
+//	010=D
+//	011=E
+//	100=H
+//	101=L
+//	110=M   (Memory reference through address in H:L)
 func (m *CPU) selectOperand(s byte) (reg *byte, mem []byte) {
 	switch s {
 	case 7:
@@ -148,6 +158,12 @@ func (m *CPU) selectOperand(s byte) (reg *byte, mem []byte) {
 	return
 }
 
+// Double register selectors:
+//
+//	00=BC   (B:C as 16 bit register)
+//	01=DE   (D:E as 16 bit register)
+//	10=HL   (H:L as 16 bit register)
+//	11=SP   (Stack pointer, refers to PSW (FLAGS:A) for PUSH/POP)
 func (m *CPU) selectDoubleOperand(s byte) (r1, r2 *byte, sp *uint16) {
 	switch s {
 	case 0:
@@ -209,6 +225,15 @@ type ConditionCode byte
 func (cc ConditionCode) String() string { return conditionNames[cc : cc+1] }
 
 func (cc ConditionCode) Check(m *CPU) bool {
+	// Condition code 'Cnd' fields:
+	//    000=NZ 'Z' Z=0
+	//    001=Z  'z'
+	//    010=NC 'C'
+	//    011=C  'c'
+	//    100=P0 'P' P=0
+	//    101=P1 'p' P=1
+	//    110=+  'S'
+	//    111=-  's'
 	switch cc {
 	case 0:
 		return !m.PSW.Z
