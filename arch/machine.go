@@ -1,9 +1,6 @@
 package arch
 
-import (
-	"fmt"
-	"io"
-)
+import "fmt"
 
 type PSW struct {
 	Z bool // Zero flag
@@ -13,49 +10,38 @@ type PSW struct {
 	A bool // Auxiliary carry flag for decimal arithmetics
 }
 
+func (psw *PSW) String() string {
+	v := 0
+	if psw.Z {
+		v |= 1
+	}
+	if psw.S {
+		v |= 2
+	}
+	if psw.P {
+		v |= 4
+	}
+	if psw.C {
+		v |= 8
+	}
+	if psw.A {
+		v |= 0x10
+	}
+	return fmt.Sprintf("ZSPCA: %05b", v)
+}
+
 type Registers struct {
 	A, B, C, D, E, H, L byte // 8-bit general-purpose registers
 }
 
-type Memory [65536]byte
-
-func (m *Memory) DumpSparse(out io.Writer) error {
-	for i := range m {
-		if m[i] != 0 {
-			_, err := fmt.Fprintf(out, "%04x: 0x%02x\n", i, m[i])
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (m *Memory) Dump(out io.Writer, start, end int) error {
-	for i := start; i < end; i++ {
-		if (i-start)%16 == 0 {
-			_, err := fmt.Fprintf(out, "\n%04x:", i)
-			if err != nil {
-				return err
-			}
-		}
-		_, err := fmt.Fprintf(out, " %02x", m[i])
-		if err != nil {
-			return err
-		}
-		if (i-start)%16 == 15 {
-			_, err := fmt.Fprintf(out, "\n")
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+func (r *Registers) String() string {
+	return fmt.Sprintf("A:%02x B:%02x C:%02x D:%02x E:%02x H:%02x L:%02x",
+		r.A, r.B, r.C, r.D, r.E, r.H, r.L)
 }
 
 type Ports [256]byte
 
-type Machine struct {
+type CPU struct {
 	Registers Registers
 
 	PSW PSW
@@ -67,12 +53,11 @@ type Machine struct {
 	In, Out    Ports
 }
 
-func (m *Machine) String() string {
-	return fmt.Sprintf("A: %02x B: %02x C: %02x D: %02x E: %02x H: %02x L: %02x PC: %04x SP: %04x ZSPCA: %v",
-		m.Registers.A, m.Registers.B, m.Registers.C, m.Registers.D, m.Registers.E, m.Registers.H, m.Registers.L, m.PC, m.SP, m.PSW)
+func (m *CPU) String() string {
+	return fmt.Sprintf("%s %s", &m.Registers, &m.PSW)
 }
 
-func (m *Machine) Exec(ins Instruction) {
+func (m *CPU) Exec(ins Instruction) {
 	pc := m.PC
 	ins.Execute(m)
 	if pc == m.PC {
@@ -80,7 +65,7 @@ func (m *Machine) Exec(ins Instruction) {
 	}
 }
 
-func (m *Machine) Step() (Instruction, error) {
+func (m *CPU) Step() (Instruction, error) {
 	cmd, _, err := DecodeBytes(m.Memory[m.PC:])
 	if err != nil {
 		return cmd, err
@@ -89,7 +74,7 @@ func (m *Machine) Step() (Instruction, error) {
 	return cmd, nil
 }
 
-func (m *Machine) psw() byte {
+func (m *CPU) psw() byte {
 	res := byte(2) // Bit 0 is always 1, bits 3 and 5 are always 0.
 	if m.PSW.C {
 		res |= 1
@@ -109,7 +94,7 @@ func (m *Machine) psw() byte {
 	return res
 }
 
-func (m *Machine) setPSW(v byte) {
+func (m *CPU) setPSW(v byte) {
 	if v&0x02 != 0x02 {
 		panic(fmt.Errorf("invalid PSW value %02x", v))
 	}
@@ -120,22 +105,22 @@ func (m *Machine) setPSW(v byte) {
 	m.PSW.S = v&0x80 == 0x80
 }
 
-func (m *Machine) setAddA(v1, v2, c int16) {
+func (m *CPU) setAddA(v1, v2, c int16) {
 	m.PSW.A = ((v1 & 0x0F) + (v2 & 0x0F) + (c & 0x0F)) > 0x0F
 }
 
-func (m *Machine) setSubA(v1, v2, c int16) {
+func (m *CPU) setSubA(v1, v2, c int16) {
 	m.PSW.A = ((v1 & 0x0F) - (v2 & 0x0F) - (c & 0x0F)) < 0
 }
 
-func (m *Machine) setZSPC(v int16) {
+func (m *CPU) setZSPC(v int16) {
 	m.PSW.Z = v == 0
 	m.PSW.S = v&0x0080 == 0x0080
 	m.PSW.P = v&1 == 1
 	m.PSW.C = v < -0xFF || v > 0xFF
 }
 
-func (m *Machine) selectOperand(s byte) (reg *byte, mem []byte) {
+func (m *CPU) selectOperand(s byte) (reg *byte, mem []byte) {
 	switch s {
 	case 7:
 		reg = &m.Registers.A
@@ -163,7 +148,7 @@ func (m *Machine) selectOperand(s byte) (reg *byte, mem []byte) {
 	return
 }
 
-func (m *Machine) selectDoubleOperand(s byte) (r1, r2 *byte, sp *uint16) {
+func (m *CPU) selectDoubleOperand(s byte) (r1, r2 *byte, sp *uint16) {
 	switch s {
 	case 0:
 		r1 = &m.Registers.B
@@ -182,24 +167,24 @@ func (m *Machine) selectDoubleOperand(s byte) (r1, r2 *byte, sp *uint16) {
 	return
 }
 
-func (m *Machine) push8(v byte) {
+func (m *CPU) push8(v byte) {
 	m.SP--
 	m.Memory[m.SP] = v
 }
 
-func (m *Machine) push16(v uint16) {
+func (m *CPU) push16(v uint16) {
 	m.Memory[m.SP-1] = byte(v >> 8)
 	m.Memory[m.SP-2] = byte(v & 0xFF)
 	m.SP -= 2
 }
 
-func (m *Machine) pop8() byte {
+func (m *CPU) pop8() byte {
 	r := m.Memory[m.SP]
 	m.SP++
 	return r
 }
 
-func (m *Machine) pop16() uint16 {
+func (m *CPU) pop16() uint16 {
 	r := uint16(m.Memory[m.SP]) | uint16(m.Memory[m.SP+1])<<8
 	m.SP += 2
 	return r
@@ -208,7 +193,7 @@ func (m *Machine) pop16() uint16 {
 type Instruction struct {
 	Name    string
 	Size    byte
-	Execute func(m *Machine)
+	Execute func(m *CPU)
 }
 
 type RegisterCode byte
@@ -223,7 +208,7 @@ type ConditionCode byte
 
 func (cc ConditionCode) String() string { return conditionNames[cc : cc+1] }
 
-func (cc ConditionCode) Check(m *Machine) bool {
+func (cc ConditionCode) Check(m *CPU) bool {
 	switch cc {
 	case 0:
 		return !m.PSW.Z

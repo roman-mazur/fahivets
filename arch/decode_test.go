@@ -11,18 +11,18 @@ func TestDecodeAndExecute(t *testing.T) {
 	testCases := []struct {
 		name          string
 		input         []byte
-		initialState  Machine
-		expectedState Machine
+		initialState  CPU
+		expectedState CPU
 		expectedSize  int
 		expectedError bool
 	}{
 		{
 			name:  "NOP",
 			input: []byte{0x00},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001, // PC should increment by instruction size
 			},
 			expectedSize: 1,
@@ -30,10 +30,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CMC",
 			input: []byte{0x3F},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				PSW: PSW{
 					C: true, // Carry flag should be toggled
@@ -44,10 +44,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "STC",
 			input: []byte{0x37},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				PSW: PSW{
 					C: true, // Carry flag should be set
@@ -58,14 +58,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ADC B (A = A + B + Carry, no carry)",
 			input: []byte{0x88}, // ADC B
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x01,
 					B: 0x02,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x03,
@@ -78,14 +78,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ADD B",
 			input: []byte{0x80},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x01,
 					B: 0x02,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x03, // A = A + B
@@ -98,13 +98,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ADI data",
 			input: []byte{0xC6, 0x05},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x01,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0x06, // A = A + 5
@@ -115,7 +115,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ACI data",
 			input: []byte{0xCE, 0x05},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x01,
@@ -124,7 +124,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					C: true, //Carry is set
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0x07, // A = A + 5 + Carry
@@ -136,14 +136,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ANA B",
 			input: []byte{0xA0},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x02,
 					B: 0x01,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x00,
@@ -158,13 +158,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ANI data",
 			input: []byte{0xE6, 0x01},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x02,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0x00,
@@ -178,13 +178,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CMA",
 			input: []byte{0x2F},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x51,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0xAE,
@@ -195,7 +195,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CMP E (A > E)",
 			input: []byte{0xBB}, // CMP E
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x0A,
@@ -203,7 +203,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				},
 				PSW: PSW{C: true}, // Initial Carry flag
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x0A,
@@ -216,14 +216,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CMP E (A < E)",
 			input: []byte{0xBB}, // CMP E
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x02,
 					E: 0x05,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x02,
@@ -236,7 +236,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CMP E (A == E)",
 			input: []byte{0xBB}, // CMP E
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x0A,
@@ -244,7 +244,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				},
 				PSW: PSW{C: true}, // Initial Carry flag
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x0A,
@@ -257,14 +257,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CPI data",
 			input: []byte{0xFE, 0x05},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x0A,
 				},
 				PSW: PSW{C: true},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0x0A,
@@ -276,13 +276,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "INR B",
 			input: []byte{0x04},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					B: 0x01,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					B: 0x02,
@@ -293,13 +293,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DCR B",
 			input: []byte{0x05},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					B: 0x01,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					B: 0x00,
@@ -313,7 +313,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SUB B",
 			input: []byte{0x90},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x03,
@@ -323,7 +323,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					C: true,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x02,
@@ -338,7 +338,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SUI data",
 			input: []byte{0xD6, 0x01},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x03,
@@ -347,7 +347,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					C: true,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0x02,
@@ -361,14 +361,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "XRA B",
 			input: []byte{0xA8},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x0A,
 					B: 0x0A,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x00,
@@ -389,11 +389,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CALL 0x2050",
 			input: []byte{0xCD, 0x50, 0x20}, // CALL 0x2050
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x2050, // PC should point to the called address
 				SP: 0x1FFE, // SP should be decremented by 2
 				Memory: Memory{
@@ -406,12 +406,12 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CC 0x2050 (Carry Set)",
 			input: []byte{0xDC, 0x50, 0x20}, // CC 0x2050
-			initialState: Machine{
+			initialState: CPU{
 				PC:  0x1000,
 				SP:  0x2000,
 				PSW: PSW{C: true}, // Carry flag is set
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:  0x2050, // PC should point to the called address
 				SP:  0x1FFE, // SP should be decremented by 2
 				PSW: PSW{C: true},
@@ -425,12 +425,12 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CC 0x2050 (Carry Not Set)",
 			input: []byte{0xDC, 0x50, 0x20}, // CC 0x2050
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				SP: 0x2000,
 				// Carry flag is not set
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1003, // PC should increment to the next instruction
 				SP: 0x2000, // SP should not change
 				// Memory should not change
@@ -440,12 +440,12 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CM 0x2050 (Sign Set)",
 			input: []byte{0xFC, 0x50, 0x20}, // CM 0x2050
-			initialState: Machine{
+			initialState: CPU{
 				PC:  0x1000,
 				SP:  0x2000,
 				PSW: PSW{S: true}, // Sign flag is set
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:  0x2050, // PC should point to the called address
 				SP:  0x1FFE, // SP should be decremented by 2
 				PSW: PSW{S: true},
@@ -459,11 +459,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "CM 0x2050 (Sign Not Set)",
 			input: []byte{0xFC, 0x50, 0x20}, // CM 0x2050
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1003, // PC should increment to the next instruction
 				SP: 0x2000, // SP should not change
 			},
@@ -472,12 +472,12 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DAA (A = 0x9B)",
 			input: []byte{0x27}, // DAA
-			initialState: Machine{
+			initialState: CPU{
 				PC:        0x1000,
 				Registers: Registers{A: 0x9B},
 				PSW:       PSW{S: true},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:        0x1001,
 				Registers: Registers{A: 0x01},
 				PSW:       PSW{C: true, P: true, A: true},
@@ -487,7 +487,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DAD D (H:L = 0x0101, D:E = 0x0100)",
 			input: []byte{0x19}, // DAD D
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					H: 0x01,
 					L: 0x01,
@@ -497,7 +497,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					H: 0x02,
 					L: 0x01,
@@ -512,7 +512,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DAD B (H:L = 0xA17B, B:C = 0x6000, overflow)",
 			input: []byte{0x09}, // DAD B
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					H: 0xA1,
 					L: 0x7B,
@@ -522,7 +522,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					H: 0x01,
 					L: 0x7B,
@@ -538,7 +538,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DCR M (H:L points to memory location 0x3A7C, MEM(0x3A7C) = 0x02)",
 			input: []byte{0x35}, // DCR M
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					H: 0x3A,
 					L: 0x7C,
@@ -547,7 +547,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				SP:     0x2000,
 				Memory: [65536]byte{0x3A7C: 0x02}, // Memory must be initialized
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					H: 0x3A,
 					L: 0x7C,
@@ -562,14 +562,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DCR A (A = 42)",
 			input: []byte{0x3D}, // DCR A
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 42,
 				},
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 41,
 				},
@@ -582,7 +582,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DCX H (H:L = 0x4000)",
 			input: []byte{0x2B}, // DCX H
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					H: 0x40,
 					L: 0x00,
@@ -590,7 +590,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					H: 0x3F,
 					L: 0xFF,
@@ -603,7 +603,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "PUSH B (B:C = 0x1234, SP = 0x2000)",
 			input: []byte{0xC5}, // PUSH B
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					B: 0x12,
 					C: 0x34,
@@ -611,7 +611,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				SP: 0x2000,
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					B: 0x12,
 					C: 0x34,
@@ -625,12 +625,12 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "POP B (SP = 0x1FFE, MEM(0x1FFE) = 0x56, MEM(0x1FFF) = 0x78)",
 			input: []byte{0xC1}, // POP B
-			initialState: Machine{
+			initialState: CPU{
 				SP:     0x1FFE,
 				PC:     0x1000,
 				Memory: [65536]byte{0x1FFE: 0x56, 0x1FFF: 0x78},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					B: 0x78,
 					C: 0x56,
@@ -644,7 +644,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RLC (A = 0x85)",
 			input: []byte{0x07}, // RLC
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x85, // 10000101
 				},
@@ -652,7 +652,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				SP:  0x2000,
 				PSW: PSW{C: true},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0x0B, // 00001011
 				},
@@ -665,7 +665,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RRC (A = 0x81)",
 			input: []byte{0x0F}, // RRC
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x81, // 10000001
 				},
@@ -673,7 +673,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				SP:  0x2000,
 				PSW: PSW{C: true},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0xC0, // 11000000
 				},
@@ -686,7 +686,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RAL (A = 0x55, C = 0)",
 			input: []byte{0x17}, // RAL
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x55, // 01010101
 				},
@@ -694,7 +694,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC:  0x1000,
 				SP:  0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0xAA, // 10101010
 				},
@@ -707,7 +707,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RAR (A = 0x55, C = 1)",
 			input: []byte{0x1F}, // RAR
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x55, // 01010101
 				},
@@ -715,7 +715,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC:  0x1000,
 				SP:  0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0xAA, // 10101010
 				},
@@ -728,12 +728,12 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RET (SP = 0x1000, MEM(0x1000) = 0x50, MEM(0x1001) = 0x20)",
 			input: []byte{0xC9}, // RET
-			initialState: Machine{
+			initialState: CPU{
 				SP:     0x1000,
 				PC:     0x2000,
 				Memory: [65536]byte{0x1000: 0x50, 0x1001: 0x20},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				SP:     0x1002,
 				PC:     0x2050,
 				Memory: [65536]byte{0x1000: 0x50, 0x1001: 0x20},
@@ -743,13 +743,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RC (C = 1, SP = 0x1000, MEM(0x1000) = 0x50, MEM(0x1001) = 0x20)",
 			input: []byte{0xD8}, // RC
-			initialState: Machine{
+			initialState: CPU{
 				SP:     0x1000,
 				PC:     0x2000,
 				PSW:    PSW{C: true},
 				Memory: [65536]byte{0x1000: 0x50, 0x1001: 0x20},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				SP:     0x1002,
 				PC:     0x2050,
 				PSW:    PSW{C: true},
@@ -760,13 +760,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RC (C = 0, SP = 0x1000, MEM(0x1000) = 0x50, MEM(0x1001) = 0x20)",
 			input: []byte{0xD8}, // RC
-			initialState: Machine{
+			initialState: CPU{
 				SP:     0x1000,
 				PC:     0x2000,
 				PSW:    PSW{C: false},
 				Memory: [65536]byte{0x1000: 0x50, 0x1001: 0x20},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				SP:     0x1000,
 				PC:     0x2001,
 				PSW:    PSW{C: false},
@@ -777,11 +777,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RST 0 (PC = 0x2000, SP = 0x1000)",
 			input: []byte{0xC7}, // RST 0
-			initialState: Machine{
+			initialState: CPU{
 				SP: 0x1000,
 				PC: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				SP:     0x0FFE,
 				PC:     0x0000,
 				Memory: [65536]byte{0x0FFF: 0x20, 0x0FFE: 0x01},
@@ -791,11 +791,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "RST 1 (PC = 0x2000, SP = 0x1000)",
 			input: []byte{0xCF}, // RST 1
-			initialState: Machine{
+			initialState: CPU{
 				SP: 0x1000,
 				PC: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				SP:     0x0FFE,
 				PC:     0x0008,
 				Memory: [65536]byte{0x0FFF: 0x20, 0x0FFE: 0x01},
@@ -805,7 +805,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SBB B (A = 0x3E, B = 0x2A, C = 0)",
 			input: []byte{0x98}, // SBB B
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x3E,
 					B: 0x2A,
@@ -814,7 +814,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC:  0x1000,
 				SP:  0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0x14,
 					B: 0x2A,
@@ -828,7 +828,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SBB B (A = 0x3E, B = 0x3E, C = 0)",
 			input: []byte{0x98}, // SBB B
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x3E,
 					B: 0x3E,
@@ -836,7 +836,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0x00,
 					B: 0x3E,
@@ -850,7 +850,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SBB L (A = 0x04, L = 0x02, C = 1)",
 			input: []byte{0x9D}, // SBB L
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x04,
 					L: 0x02,
@@ -859,7 +859,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC:  0x1000,
 				SP:  0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0x01,
 					L: 0x02,
@@ -873,7 +873,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SBI (A = 0x3E, data = 0x2A, C = 0)",
 			input: []byte{0xDE, 0x2A}, // SBI 0x2A
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x3E,
 				},
@@ -881,7 +881,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC:  0x1000,
 				SP:  0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0x14,
 				},
@@ -894,14 +894,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SBI (A = 0x05, data = 0x10, C = 0)",
 			input: []byte{0xDE, 0x10}, // SBI 0x10
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x05,
 				},
 				PC: 0x1000,
 				SP: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				Registers: Registers{
 					A: 0xF5,
 				},
@@ -914,7 +914,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SBI (A = 0x05, data = 0x04, C = 1)",
 			input: []byte{0xDE, 0x04}, // SBI 0x04
-			initialState: Machine{
+			initialState: CPU{
 				Registers: Registers{
 					A: 0x05,
 				},
@@ -922,7 +922,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				PC:  0x1000,
 				SP:  0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				// Zero registers.
 				PSW: PSW{Z: true, A: true},
 				PC:  0x1002,
@@ -933,14 +933,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SHLD",
 			input: []byte{0x22, 0x22, 0x11}, // SHLD 0x1122
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					H: 0x02,
 					L: 0x03,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1003,
 				Registers: Registers{
 					H: 0x02,
@@ -953,14 +953,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SPHL",
 			input: []byte{0xF9},
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					H: 0x02,
 					L: 0x03,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				SP: 0x0203,
 				Registers: Registers{
@@ -973,13 +973,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "STA",
 			input: []byte{0x32, 0x44, 0x33}, // STA 0x3344
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x2A,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1003,
 				Registers: Registers{
 					A: 0x2A,
@@ -991,14 +991,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SUB",
 			input: []byte{0x90}, // SUB B
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x0A,
 					B: 0x05,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x05,
@@ -1013,13 +1013,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "SUI",
 			input: []byte{0xD6, 0x05}, // SUI 0x05
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0x0A,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0x05,
@@ -1033,7 +1033,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "XCHG (Exchange H-L with D-E)",
 			input: []byte{0xEB}, // XCHG
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					H: 0x12,
@@ -1042,7 +1042,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					E: 0x78,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					H: 0x56,
@@ -1056,14 +1056,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "XRA A (A = A ^ A, result is 0)",
 			input: []byte{0xAF}, // XRA A
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0xFF,
 				},
 				PSW: PSW{},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0x00,
@@ -1075,14 +1075,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "XRI",
 			input: []byte{0xEE, 0x55}, // XRI 0x55
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0xAA,
 				},
 				PSW: PSW{},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0xFF,
@@ -1094,13 +1094,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "XTHL (Exchange H-L with top of stack)",
 			input: []byte{0xE3}, // XTHL
-			initialState: Machine{
+			initialState: CPU{
 				PC:        0x1000,
 				SP:        0x2002,
 				Registers: Registers{H: 0x12, L: 0x34},
 				Memory:    Memory{0x2002: 0x56, 0x2003: 0x78},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:        0x1001,
 				SP:        0x2002,
 				Registers: Registers{H: 0x78, L: 0x56},
@@ -1112,10 +1112,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "EI (Enable Interrupts)",
 			input: []byte{0xFB}, // EI
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:         0x1001,
 				Interrupts: true,
 			},
@@ -1124,11 +1124,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "DI (Disable Interrupts)",
 			input: []byte{0xF3}, // DI
-			initialState: Machine{
+			initialState: CPU{
 				PC:         0x1000,
 				Interrupts: true,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:         0x1001,
 				Interrupts: false,
 			},
@@ -1137,10 +1137,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "HLT (Halt Execution)",
 			input: []byte{0x76}, // HLT
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0,
 			},
 			expectedSize: 1,
@@ -1148,11 +1148,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "IN (Input from port)",
 			input: []byte{0xDB, 0x10}, // IN 0x10
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				In: Ports{0x10: 0x7F}, // Port 0x10 holds the value 0x7F
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1002,
 				In: Ports{0x10: 0x7F}, // Port state remains unchanged
 				Registers: Registers{
@@ -1164,13 +1164,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "OUT (Output to port)",
 			input: []byte{0xD3, 0x10}, // OUT 0x10
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					A: 0xAB,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:  0x1002,
 				Out: Ports{0x10: 0xAB},
 				Registers: Registers{
@@ -1182,14 +1182,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "INX H (Increment HL Pair)",
 			input: []byte{0x23}, // INX H
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					H: 0x12,
 					L: 0x34,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					H: 0x12, // High byte remains 0x12
@@ -1201,14 +1201,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "INX H (Increment HL Pair with Carry)",
 			input: []byte{0x23}, // INX H
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					H: 0x12,
 					L: 0xFF,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					H: 0x13, // High byte incremented due to carry
@@ -1220,10 +1220,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "JMP (Unconditional Jump)",
 			input: []byte{0xC3, 0x00, 0x20}, // JMP 0x2000
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x2000, // Program counter jumps to 0x2000
 			},
 			expectedSize: 3,
@@ -1231,11 +1231,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "JC (Jump if Carry - Carry Set)",
 			input: []byte{0xDA, 0x00, 0x20}, // JC 0x2000
-			initialState: Machine{
+			initialState: CPU{
 				PC:  0x1000,
 				PSW: PSW{C: true}, // Carry flag is set
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:  0x2000,       // Program counter jumps to 0x2000
 				PSW: PSW{C: true}, // Carry flag remains unchanged
 			},
@@ -1244,11 +1244,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "JC (Jump if Carry - Carry Not Set)",
 			input: []byte{0xDA, 0x00, 0x20}, // JC 0x2000
-			initialState: Machine{
+			initialState: CPU{
 				PC:  0x1000,
 				PSW: PSW{C: false}, // Carry flag is not set
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:  0x1003,        // Program counter just increments
 				PSW: PSW{C: false}, // Carry flag remains unchanged
 			},
@@ -1257,11 +1257,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "JZ (Jump if Zero - Zero Flag Set)",
 			input: []byte{0xCA, 0x00, 0x20}, // JZ 0x2000
-			initialState: Machine{
+			initialState: CPU{
 				PC:  0x1000,
 				PSW: PSW{Z: true}, // Zero flag is set
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:  0x2000,       // Program counter jumps to 0x2000
 				PSW: PSW{Z: true}, // Zero flag remains unchanged
 			},
@@ -1270,11 +1270,11 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "JZ (Jump if Zero - Zero Flag Not Set)",
 			input: []byte{0xCA, 0x00, 0x20}, // JZ 0x2000
-			initialState: Machine{
+			initialState: CPU{
 				PC:  0x1000,
 				PSW: PSW{Z: false}, // Zero flag is not set
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC:  0x1003,        // Program counter just increments
 				PSW: PSW{Z: false}, // Zero flag remains unchanged
 			},
@@ -1283,13 +1283,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LDA (Load Accumulator Direct Address)",
 			input: []byte{0x3A, 0x10, 0x20}, // LDA 0x2010
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Memory: Memory{
 					0x2010: 0xAB,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1003,
 				Registers: Registers{
 					A: 0xAB,
@@ -1303,7 +1303,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LDAX (Load Accumulator Indirect Address from BC)",
 			input: []byte{0x0A}, // LDAX BC
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					B: 0x20,
@@ -1313,7 +1313,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					0x2010: 0xAB,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0xAB,
@@ -1329,7 +1329,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LDAX (Load Accumulator Indirect Address from DE)",
 			input: []byte{0x1A}, // LDAX D
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Registers: Registers{
 					D: 0x30,
@@ -1339,7 +1339,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					0x3020: 0xCD,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1001,
 				Registers: Registers{
 					A: 0xCD,
@@ -1355,14 +1355,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LHLD (Load H and L Direct Address)",
 			input: []byte{0x2A, 0x10, 0x20}, // LHLD 0x2010
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 				Memory: Memory{
 					0x2010: 0x34,
 					0x2011: 0x12,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1003,
 				Registers: Registers{
 					L: 0x34,
@@ -1378,10 +1378,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LXI (Load Register Pair Immediate - BC)",
 			input: []byte{0x01, 0x34, 0x12}, // LXI B, 0x1234
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x1000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1003,
 				Registers: Registers{
 					B: 0x12,
@@ -1393,10 +1393,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LXI (Load Register Pair Immediate - DE)",
 			input: []byte{0x11, 0x78, 0x56}, // LXI D, 0x5678
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x2000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x2003,
 				Registers: Registers{
 					D: 0x56,
@@ -1408,10 +1408,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LXI (Load Register Pair Immediate - HL)",
 			input: []byte{0x21, 0x9A, 0xBC}, // LXI H, 0xBC9A
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x3000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x3003,
 				Registers: Registers{
 					H: 0xBC,
@@ -1423,10 +1423,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "LXI (Load Stack Pointer Immediate)",
 			input: []byte{0x31, 0xEF, 0xCD}, // LXI SP, 0xCDEF
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x4000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x4003,
 				SP: 0xCDEF,
 			},
@@ -1435,13 +1435,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "MOV (Move Register B to Register A)",
 			input: []byte{0x78}, // MOV A, B
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x5000,
 				Registers: Registers{
 					B: 0x56,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x5001,
 				Registers: Registers{
 					A: 0x56,
@@ -1453,7 +1453,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "MOV (Move Memory to Register L)",
 			input: []byte{0x6E}, // MOV L, M
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x6000,
 				Registers: Registers{
 					H: 0x20,
@@ -1463,7 +1463,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					0x2010: 0x89,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x6001,
 				Registers: Registers{
 					H: 0x20,
@@ -1478,10 +1478,10 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "MVI (Move Immediate to Register B)",
 			input: []byte{0x06, 0xAB}, // MVI B, 0xAB
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x7000,
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x7002,
 				Registers: Registers{
 					B: 0xAB,
@@ -1492,7 +1492,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "MVI (Move Immediate to Memory Location Indexed by HL)",
 			input: []byte{0x36, 0xCD}, // MVI M, 0xCD
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x8000,
 				Registers: Registers{
 					H: 0x22,
@@ -1500,7 +1500,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				},
 				Memory: Memory{},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x8002,
 				Registers: Registers{
 					H: 0x22,
@@ -1515,14 +1515,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ORA (Logical OR Accumulator with Register B)",
 			input: []byte{0xB0}, // ORA B
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0x9000,
 				Registers: Registers{
 					A: 0x0F,
 					B: 0xF0,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x9001,
 				Registers: Registers{
 					A: 0xFF,
@@ -1535,13 +1535,13 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "ORI (Logical OR Accumulator with Immediate)",
 			input: []byte{0xF6, 0x3C}, // ORI 0x3C
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0xA000,
 				Registers: Registers{
 					A: 0xC3,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0xA002,
 				Registers: Registers{
 					A: 0xFF,
@@ -1553,14 +1553,14 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "PCHL (Load HL into PC)",
 			input: []byte{0xE9}, // PCHL
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0xB000,
 				Registers: Registers{
 					H: 0x12,
 					L: 0x34,
 				},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0x1234,
 				Registers: Registers{
 					H: 0x12,
@@ -1572,7 +1572,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "STAX (Store Accumulator in Memory Addressed by BC)",
 			input: []byte{0x02}, // STAX B
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0xC000,
 				Registers: Registers{
 					A: 0x5A,
@@ -1581,7 +1581,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				},
 				Memory: Memory{},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0xC001,
 				Registers: Registers{
 					A: 0x5A,
@@ -1597,7 +1597,7 @@ func TestDecodeAndExecute(t *testing.T) {
 		{
 			name:  "STAX (Store Accumulator in Memory Addressed by DE)",
 			input: []byte{0x12}, // STAX D
-			initialState: Machine{
+			initialState: CPU{
 				PC: 0xC100,
 				Registers: Registers{
 					A: 0x7E,
@@ -1606,7 +1606,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				},
 				Memory: Memory{},
 			},
-			expectedState: Machine{
+			expectedState: CPU{
 				PC: 0xC101,
 				Registers: Registers{
 					A: 0x7E,
@@ -1650,7 +1650,7 @@ func TestDecodeAndExecute(t *testing.T) {
 	}
 }
 
-func dumpMemory(t *testing.T, m *Machine) {
+func dumpMemory(t *testing.T, m *CPU) {
 	t.Helper()
 	t.Log("memory:")
 	_ = m.Memory.DumpSparse(newTestWriter(t))

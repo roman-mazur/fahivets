@@ -30,22 +30,22 @@ func TestBootloader(t *testing.T) {
 		monitorStart = 0xC830
 	)
 
-	var m Machine
+	var m CPU
 	copy(m.Memory[romStart:], bootProg)
 	copy(m.Memory[monitorStart:], monitorProg)
-	m.SP = romStart
 	m.PC = romStart
 
 	tOut := newTestWriter(t)
 
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 16000; i++ {
+		addr := m.PC
 		cmd, err := m.Step()
 		if err != nil {
-			t.Logf("step %d: %s", i, &m)
+			t.Logf("0x%04x: %s", addr, &m)
 			_ = m.Memory.DumpSparse(tOut)
 			t.Fatal(err)
 		}
-		t.Log(i, cmd.Name)
+		t.Logf("0x%04x: %s\t%s", addr, cmd.Name, &m)
 	}
-	//_ = m.Memory.Dump(tOut, videoStart, romStart)
+	_ = m.Memory.Dump(tOut, 0xff00, 0xffff+1)
 }

@@ -5,7 +5,7 @@ import (
 )
 
 func TestACI(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 2
 	m.PSW.C = true
 
@@ -17,7 +17,7 @@ func TestACI(t *testing.T) {
 }
 
 func TestADC(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 2
 	m.Registers.B = 1
 	m.PSW.C = true
@@ -30,7 +30,7 @@ func TestADC(t *testing.T) {
 }
 
 func TestADD(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 2
 	m.Registers.C = 1
 	m.PSW.C = true
@@ -43,7 +43,7 @@ func TestADD(t *testing.T) {
 }
 
 func TestADI(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 42
 	m.PSW.C = false
 
@@ -55,7 +55,7 @@ func TestADI(t *testing.T) {
 }
 
 func TestANA(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 2
 	m.Registers.D = 1
 
@@ -84,7 +84,7 @@ func TestANA(t *testing.T) {
 }
 
 func TestANI(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 2
 
 	ANI(1).Execute(&m)
@@ -95,7 +95,7 @@ func TestANI(t *testing.T) {
 }
 
 func TestCMA(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0x51
 
 	CMA().Execute(&m)
@@ -106,7 +106,7 @@ func TestCMA(t *testing.T) {
 }
 
 func TestCMC(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.PSW.C = false
 
 	CMC().Execute(&m)
@@ -115,7 +115,7 @@ func TestCMC(t *testing.T) {
 		t.Errorf("CMC: fC = %v, want true", m.PSW.C)
 	}
 
-	var m2 Machine
+	var m2 CPU
 	m2.PSW.C = true
 	CMC().Execute(&m2)
 
@@ -125,7 +125,7 @@ func TestCMC(t *testing.T) {
 }
 
 func TestCMP(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0x0A
 	m.Registers.E = 0x05
 	m.PSW.C = true
@@ -136,7 +136,7 @@ func TestCMP(t *testing.T) {
 		t.Errorf("CMP(A=%x, E=%x): fC = %v, want false", m.Registers.A, m.Registers.E, m.PSW.C)
 	}
 
-	var m2 Machine
+	var m2 CPU
 	m2.Registers.A = 0x02
 	m2.Registers.E = 0x05
 	m2.PSW.C = false
@@ -149,7 +149,7 @@ func TestCMP(t *testing.T) {
 		t.Errorf("CMP(A=%x, E=%x): fC = %v, want true", m2.Registers.A, m2.Registers.E, m2.PSW.C)
 	}
 
-	var m3 Machine
+	var m3 CPU
 	m3.Registers.A = 0x0A
 	m3.Registers.E = 0x0A
 	m3.PSW.Z = false
@@ -160,7 +160,7 @@ func TestCMP(t *testing.T) {
 		t.Errorf("CMP(A=%x, E=%x): fZ = %v, want true", m3.Registers.A, m3.Registers.E, m3.PSW.C)
 	}
 
-	var m4 Machine
+	var m4 CPU
 	m4.Registers.A = 0xEB // -0x15
 	m4.Registers.E = 0x05
 	m4.PSW.C = true
@@ -173,7 +173,7 @@ func TestCMP(t *testing.T) {
 }
 
 func TestCPI(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0x0A
 	m.PSW.C = true
 
@@ -185,7 +185,7 @@ func TestCPI(t *testing.T) {
 }
 
 func TestDAA(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0x9B
 	DAA().Execute(&m)
 
@@ -203,7 +203,7 @@ func TestDAA(t *testing.T) {
 }
 
 func TestDAD(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.D = 1
 	m.Registers.E = 0
 	m.Registers.H = 1
@@ -219,7 +219,7 @@ func TestDAD(t *testing.T) {
 		t.Errorf("DAD: L = %v, want 1", m.Registers.L)
 	}
 
-	var m2 Machine
+	var m2 CPU
 	m2.Registers.B = 0x33
 	m2.Registers.C = 0x9F
 	m2.Registers.H = 0xA1
@@ -236,7 +236,7 @@ func TestDAD(t *testing.T) {
 }
 
 func TestDCR(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.H = 0x3A
 	m.Registers.L = 0x7C
 	addr := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
@@ -247,7 +247,7 @@ func TestDCR(t *testing.T) {
 		t.Errorf("DCR: MEM(0x3A7C) = %v, want 1", m.Memory[addr])
 	}
 
-	var m2 Machine
+	var m2 CPU
 	m2.Registers.A = 42
 	DCR(7).Execute(&m2) // r/m = b111
 
@@ -257,7 +257,7 @@ func TestDCR(t *testing.T) {
 }
 
 func TestDCX(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.H = 0x98
 	m.Registers.L = 0x00
 
@@ -273,7 +273,7 @@ func TestDCX(t *testing.T) {
 }
 
 func TestPOP(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.PSW.Z = true
 	m.Registers.A = 1
 	m.SP = 0
@@ -285,7 +285,7 @@ func TestPOP(t *testing.T) {
 		t.Errorf("POP: fZ = %v, A = %d, want to be reset", m.PSW.Z, m.Registers.A)
 	}
 
-	var m2 Machine
+	var m2 CPU
 	m2.Registers.B = 1
 	m2.Registers.C = 1
 	m2.SP = 0
@@ -298,7 +298,7 @@ func TestPOP(t *testing.T) {
 }
 
 func TestPUSH(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.D = 1
 	m.Registers.E = 2
 
@@ -330,7 +330,7 @@ func TestPUSH(t *testing.T) {
 }
 
 func TestRLC(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0b10011001
 
 	RLC().Execute(&m)
@@ -345,7 +345,7 @@ func TestRLC(t *testing.T) {
 }
 
 func TestRRC(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0b10011001
 
 	RRC().Execute(&m)
@@ -360,7 +360,7 @@ func TestRRC(t *testing.T) {
 }
 
 func TestRAL(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0b10011001
 	m.PSW.C = false
 
@@ -376,7 +376,7 @@ func TestRAL(t *testing.T) {
 }
 
 func TestRAR(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0b10011001
 	m.PSW.C = true
 
@@ -392,7 +392,7 @@ func TestRAR(t *testing.T) {
 }
 
 func TestSTA(t *testing.T) {
-	var m Machine
+	var m CPU
 	m.Registers.A = 0x56
 	addr := uint16(0x1234)
 
@@ -404,7 +404,7 @@ func TestSTA(t *testing.T) {
 }
 
 func TestLDA(t *testing.T) {
-	var m Machine
+	var m CPU
 	addr := uint16(0x1234)
 	m.Memory[addr] = 0x7F
 
@@ -416,7 +416,7 @@ func TestLDA(t *testing.T) {
 }
 
 func TestJMP(t *testing.T) {
-	var m Machine
+	var m CPU
 	targetAddr := uint16(0x4567)
 
 	JMP(targetAddr).Execute(&m)
