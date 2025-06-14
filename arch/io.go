@@ -4,8 +4,9 @@ import (
 	"sync"
 )
 
-// IoController represents К580ВВ55 (the analog of 8255 microcontroller) that controls
+// IoController represents К580ВВ55 (the analog of Intel 8255 microcontroller) that controls
 // interactions with the keyboard and other devices.
+// See https://en.wikipedia.org/wiki/Intel_8255
 type IoController struct {
 	mem []byte
 
