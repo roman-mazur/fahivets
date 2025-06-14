@@ -31,10 +31,13 @@ var memoryMapping = [memSectionsCnt]uint16{
 	MemRegisters2K: 0xF800,
 }
 
-// MemoryMapping returns the start and end address of a particular memory section.
-func MemoryMapping(s MemSection) (start uint16, end uint16) {
+// MemoryMappingRange returns the start and end address of a particular memory section.
+func MemoryMappingRange(s MemSection) (start uint16, end uint16) {
 	return memoryMapping[s], memoryMapping[(s+1)%memSectionsCnt] - 1
 }
+
+// MemoryMapping returns the start address of the selected memory section.
+func MemoryMapping(s MemSection) uint16 { return memoryMapping[s] }
 
 func (m *Memory) DumpSparse(out io.Writer) error {
 	for i := range m {

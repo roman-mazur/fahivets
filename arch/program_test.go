@@ -1,10 +1,13 @@
-package arch
+package arch_test
 
 import (
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"rmazur.io/fahivets/arch"
+	"rmazur.io/fahivets/internal/testutil"
 )
 
 func readProgram(t *testing.T, name string) []byte {
@@ -24,18 +27,14 @@ func TestBootloader(t *testing.T) {
 	bootProg := readProgram(t, "bootloader.rom")
 	monitorProg := readProgram(t, "monitor.rom")
 
-	const (
-		videoStart   = 0x9000
-		romStart     = 0xC000
-		monitorStart = 0xC830
-	)
+	romStart := arch.MemoryMapping(arch.MemROM2K)
 
-	var m CPU
+	var m arch.CPU
 	copy(m.Memory[romStart:], bootProg)
-	copy(m.Memory[monitorStart:], monitorProg)
+	copy(m.Memory[romStart+0x830:], monitorProg)
 	m.PC = romStart
 
-	tOut := newTestWriter(t)
+	tOut := testutil.NewTestLogWriter(t)
 
 	for i := 0; i < 16000; i++ {
 		addr := m.PC

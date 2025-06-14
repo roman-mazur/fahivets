@@ -1,10 +1,11 @@
 package arch
 
 import (
-	"bytes"
 	"reflect"
 	"runtime"
 	"testing"
+
+	"rmazur.io/fahivets/internal/testutil"
 )
 
 func TestDecodeAndExecute(t *testing.T) {
@@ -1653,36 +1654,7 @@ func TestDecodeAndExecute(t *testing.T) {
 func dumpMemory(t *testing.T, m *CPU) {
 	t.Helper()
 	t.Log("memory:")
-	_ = m.Memory.DumpSparse(newTestWriter(t))
-}
-
-type testWriter struct {
-	t   *testing.T
-	buf bytes.Buffer
-}
-
-func (tw *testWriter) Write(p []byte) (n int, err error) {
-	if i := bytes.IndexByte(p, '\n'); i != -1 {
-		tw.buf.Write(p[:i])
-		if tw.buf.Len() > 0 {
-			tw.t.Logf("%s", tw.buf.String())
-			tw.buf.Reset()
-		}
-		tw.buf.Write(p[i+1:])
-	} else {
-		tw.buf.Write(p)
-	}
-	return len(p), nil
-}
-
-func newTestWriter(t *testing.T) *testWriter {
-	res := &testWriter{t: t}
-	t.Cleanup(func() {
-		if res.buf.Len() > 0 {
-			res.t.Logf("%s", res.buf.String())
-		}
-	})
-	return res
+	_ = m.Memory.DumpSparse(testutil.NewTestLogWriter(t))
 }
 
 func TestAllInstructions(t *testing.T) {

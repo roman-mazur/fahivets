@@ -24,7 +24,7 @@ const (
 )
 
 func InitIoController(m *CPU) *IoController {
-	addr, _ := MemoryMapping(MemRegisters2K)
+	addr := MemoryMapping(MemRegisters2K)
 	res := &IoController{
 		mem: m.Memory[addr : addr+4],
 
