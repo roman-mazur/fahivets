@@ -12,7 +12,7 @@ func NewTestLogWriter(t *testing.T) io.Writer {
 	res := &testWriter{t: t}
 	t.Cleanup(func() {
 		if res.buf.Len() > 0 {
-			res.t.Logf("%s", res.buf.String())
+			res.t.Log(res.buf.String())
 		}
 	})
 	return res
@@ -27,7 +27,7 @@ func (tw *testWriter) Write(p []byte) (n int, err error) {
 	if i := bytes.IndexByte(p, '\n'); i != -1 {
 		tw.buf.Write(p[:i])
 		if tw.buf.Len() > 0 {
-			tw.t.Logf("%s", tw.buf.String())
+			tw.t.Log(tw.buf.String())
 			tw.buf.Reset()
 		}
 		tw.buf.Write(p[i+1:])
