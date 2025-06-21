@@ -1,6 +1,9 @@
 package arch
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 type PSW struct {
 	Z bool // Zero flag
@@ -54,7 +57,7 @@ type CPU struct {
 }
 
 func (m *CPU) String() string {
-	return fmt.Sprintf("%s %s", &m.Registers, &m.PSW)
+	return fmt.Sprintf("%s %s PC:%04x SP:%04x", &m.Registers, &m.PSW, m.PC, m.SP)
 }
 
 func (m *CPU) Exec(ins Instruction) {
@@ -120,33 +123,34 @@ func (m *CPU) setZSPC(v int16) {
 	m.PSW.C = v < -0xFF || v > 0xFF
 }
 
-// Register selectors:
-//
-//	111=A
-//	000=B
-//	001=C
-//	010=D
-//	011=E
-//	100=H
-//	101=L
-//	110=M   (Memory reference through address in H:L)
+const (
+	RegisterSelB = iota
+	RegisterSelC
+	RegisterSelD
+	RegisterSelE
+	RegisterSelH
+	RegisterSelL
+	RegisterSelMemory // (Memory reference through address in H:L)
+	RegisterSelA
+)
+
 func (m *CPU) selectOperand(s byte) (reg *byte, mem []byte) {
 	switch s {
-	case 7:
+	case RegisterSelA:
 		reg = &m.Registers.A
-	case 0:
+	case RegisterSelB:
 		reg = &m.Registers.B
-	case 1:
+	case RegisterSelC:
 		reg = &m.Registers.C
-	case 2:
+	case RegisterSelD:
 		reg = &m.Registers.D
-	case 3:
+	case RegisterSelE:
 		reg = &m.Registers.E
-	case 4:
+	case RegisterSelH:
 		reg = &m.Registers.H
-	case 5:
+	case RegisterSelL:
 		reg = &m.Registers.L
-	case 6:
+	case RegisterSelMemory:
 		addr := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
 		if addr >= 0xFFFF {
 			panic(fmt.Errorf("memory address out of range %04x", addr))
@@ -158,24 +162,25 @@ func (m *CPU) selectOperand(s byte) (reg *byte, mem []byte) {
 	return
 }
 
-// Double register selectors:
-//
-//	00=BC   (B:C as 16 bit register)
-//	01=DE   (D:E as 16 bit register)
-//	10=HL   (H:L as 16 bit register)
-//	11=SP   (Stack pointer, refers to PSW (FLAGS:A) for PUSH/POP)
+const (
+	RegisterPairBC = iota // 00=BC   (B:C as 16 bit register)
+	RegisterPairDE        // 01=DE   (D:E as 16 bit register)
+	RegisterPairHL        // 10=HL   (H:L as 16 bit register)
+	RegisterPairSP        // 11=SP   (Stack pointer, refers to PSW (FLAGS:A) for PUSH/POP)
+)
+
 func (m *CPU) selectDoubleOperand(s byte) (r1, r2 *byte, sp *uint16) {
 	switch s {
-	case 0:
+	case RegisterPairBC:
 		r1 = &m.Registers.B
 		r2 = &m.Registers.C
-	case 1:
+	case RegisterPairDE:
 		r1 = &m.Registers.D
 		r2 = &m.Registers.E
-	case 2:
+	case RegisterPairHL:
 		r1 = &m.Registers.H
 		r2 = &m.Registers.L
-	case 3:
+	case RegisterPairSP:
 		sp = &m.SP
 	default:
 		panic(fmt.Errorf("invalid double selector %02x", s))
@@ -210,6 +215,18 @@ type Instruction struct {
 	Name    string
 	Size    byte
 	Execute func(m *CPU)
+	Encode  func(out []byte)
+}
+
+type Program []Instruction
+
+func (p Program) String() string {
+	var out bytes.Buffer
+	for _, cmd := range p {
+		out.WriteString(cmd.Name)
+		out.WriteByte('\n')
+	}
+	return out.String()
 }
 
 type RegisterCode byte
@@ -222,34 +239,36 @@ func (rpc RegisterPairCode) String() string { return pairNames[rpc] }
 
 type ConditionCode byte
 
+const (
+	ConditionCodeNZ     ConditionCode = iota // 000=NZ 'Z' Z=0
+	ConditionCodeZ                           // 001=Z  'z'
+	ConditionCodeNC                          // 010=NC 'C'
+	ConditionCodeC                           // 011=C  'c'
+	ConditionCodeP0                          // 100=P0 'P' P=0
+	ConditionCodeP1                          // 101=P1 'p' P=1
+	ConditionCodeSPlus                       // 110=+  'S'
+	ConditionCodeSMinus                      // 111=-  's'
+)
+
 func (cc ConditionCode) String() string { return conditionNames[cc : cc+1] }
 
 func (cc ConditionCode) Check(m *CPU) bool {
-	// Condition code 'Cnd' fields:
-	//    000=NZ 'Z' Z=0
-	//    001=Z  'z'
-	//    010=NC 'C'
-	//    011=C  'c'
-	//    100=P0 'P' P=0
-	//    101=P1 'p' P=1
-	//    110=+  'S'
-	//    111=-  's'
 	switch cc {
-	case 0:
+	case ConditionCodeNZ:
 		return !m.PSW.Z
-	case 1:
+	case ConditionCodeZ:
 		return m.PSW.Z
-	case 2:
+	case ConditionCodeNC:
 		return !m.PSW.C
-	case 3:
+	case ConditionCodeC:
 		return m.PSW.C
-	case 4:
+	case ConditionCodeP0:
 		return !m.PSW.P
-	case 5:
+	case ConditionCodeP1:
 		return m.PSW.P
-	case 6:
+	case ConditionCodeSPlus:
 		return !m.PSW.S
-	case 7:
+	case ConditionCodeSMinus:
 		return m.PSW.S
 	default:
 		panic(fmt.Errorf("invalid condition: 0x%02x", cc))

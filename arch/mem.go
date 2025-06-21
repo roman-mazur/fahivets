@@ -51,7 +51,7 @@ func (m *Memory) DumpSparse(out io.Writer) error {
 	return nil
 }
 
-func (m *Memory) Dump(out io.Writer, start, end int) error {
+func (m *Memory) Dump(out io.Writer, start, end uint16) error {
 	for i := start; i < end; i++ {
 		if (i-start)%16 == 0 {
 			_, err := fmt.Fprintf(out, "\n%04x:", i)

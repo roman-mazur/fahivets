@@ -109,6 +109,7 @@ func ANI(data byte) Instruction {
 		Name:    fmt.Sprintf("ANI 0x%02x", data),
 		Size:    2,
 		Execute: func(m *CPU) { andA(m, data) },
+		Encode:  func(out []byte) { out[0], out[1] = 0xE6, data },
 	}
 }
 
@@ -124,18 +125,19 @@ func CALL(addr uint16) Instruction {
 	}
 }
 
-func condition(cnd byte) func(*CPU) bool { return ConditionCode(cnd).Check }
-
 // Ccnd implements the conditional CALL instruction.
-func Ccnd(cnd byte, addr uint16) Instruction {
+func Ccnd(cnd ConditionCode, addr uint16) Instruction {
 	return Instruction{
-		Name: fmt.Sprintf("Ccnd %s 0x%04x", ConditionCode(cnd), addr),
+		Name: fmt.Sprintf("Ccnd %s 0x%04x", cnd, addr),
 		Size: 3,
 		Execute: func(m *CPU) {
-			if condition(cnd)(m) {
+			if cnd.Check(m) {
 				m.push16(m.PC + 3)
 				m.PC = addr
 			}
+		},
+		Encode: func(out []byte) {
+			out[0], out[1], out[2] = 0xC6|(byte(cnd)<<3), byte(addr&0xFF), byte((addr>>8)&0xFF)
 		},
 	}
 }
@@ -184,6 +186,7 @@ func CPI(data byte) Instruction {
 		Name:    fmt.Sprintf("CPI 0x%02x", data),
 		Size:    2,
 		Execute: func(m *CPU) { cmpA(m, int16(data)) },
+		Encode:  func(out []byte) { out[0], out[1] = 0xFE, data },
 	}
 }
 
@@ -205,7 +208,7 @@ func DAA() Instruction {
 	}
 }
 
-func storeDoubleAdd(m *CPU, h, l *byte, v1, v2 int32) int32 {
+func storeDoubleAdd(h, l *byte, v1, v2 int32) int32 {
 	result := v1 + v2
 	*h = byte((result >> 8) & 0xFF)
 	*l = byte(result & 0xFF)
@@ -221,7 +224,7 @@ func DAD(rp byte) Instruction {
 			v1 := lookup32(m.selectDoubleOperand(2)) // HL registers.
 			v2 := lookup32(m.selectDoubleOperand(rp))
 
-			res := storeDoubleAdd(m, &m.Registers.H, &m.Registers.L, v1, v2)
+			res := storeDoubleAdd(&m.Registers.H, &m.Registers.L, v1, v2)
 			m.PSW.C = res > 0xFFFF
 		},
 	}
@@ -268,6 +271,9 @@ func LXI(rp byte, data uint16) Instruction {
 				*h = byte((data >> 8) & 0xFF)
 				*l = byte(data & 0xFF)
 			}
+		},
+		Encode: func(out []byte) {
+			out[0], out[1], out[2] = 0x01|(rp<<4), byte(data&0xFF), byte(data>>8)
 		},
 	}
 }
@@ -385,12 +391,12 @@ func RRC() Instruction {
 }
 
 // Rcnd implements the conditional return instruction.
-func Rcnd(cnd byte) Instruction {
+func Rcnd(cnd ConditionCode) Instruction {
 	return Instruction{
-		Name: fmt.Sprintf("Rcnd %s", ConditionCode(cnd)),
+		Name: fmt.Sprintf("Rcnd %s", cnd),
 		Size: 1,
 		Execute: func(m *CPU) {
-			if condition(cnd)(m) {
+			if cnd.Check(m) {
 				m.PC = m.pop16()
 			}
 		},
@@ -578,6 +584,9 @@ func LHLD(addr uint16) Instruction {
 			m.Registers.L = m.Memory[addr]
 			m.Registers.H = m.Memory[addr+1]
 		},
+		Encode: func(out []byte) {
+			out[0], out[1], out[2] = 0x2A, byte(addr&0xFF), byte(addr>>8)
+		},
 	}
 }
 
@@ -608,7 +617,7 @@ func INX(rp byte) Instruction {
 				*sp++
 				return
 			}
-			storeDoubleAdd(m, h, l, int32(*h)<<8|int32(*l), 1)
+			storeDoubleAdd(h, l, int32(*h)<<8|int32(*l), 1)
 		},
 	}
 }
@@ -643,17 +652,21 @@ func JMP(addr uint16) Instruction {
 		Name:    fmt.Sprintf("JMP 0x%04x", addr),
 		Size:    3,
 		Execute: func(m *CPU) { m.PC = addr },
+		Encode:  func(out []byte) { out[0], out[1], out[2] = 0xC3, byte(addr&0xFF), byte(addr>>8) },
 	}
 }
 
-func JCnd(cnd byte, addr uint16) Instruction {
+func JCnd(cnd ConditionCode, addr uint16) Instruction {
 	return Instruction{
-		Name: fmt.Sprintf("JCnd %s 0x%04x", ConditionCode(cnd), addr),
+		Name: fmt.Sprintf("JCnd %s 0x%04x", cnd, addr),
 		Size: 3,
 		Execute: func(m *CPU) {
-			if condition(cnd)(m) {
+			if cnd.Check(m) {
 				m.PC = addr
 			}
+		},
+		Encode: func(out []byte) {
+			out[0], out[1], out[2] = 0xC2|(byte(cnd)<<3), byte(addr&0xFF), byte(addr>>8)
 		},
 	}
 }
@@ -663,6 +676,7 @@ func NOP() Instruction {
 		Name:    "NOP",
 		Size:    1,
 		Execute: func(m *CPU) {},
+		Encode:  func(out []byte) { out[0] = 0 },
 	}
 }
 
@@ -722,6 +736,9 @@ func MOV(dst byte, src byte) Instruction {
 				*dstR = val
 			}
 		},
+		Encode: func(out []byte) {
+			out[0] = 0x60 | dst<<3 | src
+		},
 	}
 }
 
@@ -738,6 +755,7 @@ func MVI(dst byte, data byte) Instruction {
 				*dstR = data
 			}
 		},
+		Encode: func(out []byte) { out[0], out[1] = 0x06|(dst<<3), data },
 	}
 }
 

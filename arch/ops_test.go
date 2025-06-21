@@ -179,8 +179,20 @@ func TestCPI(t *testing.T) {
 
 	CPI(0x05).Execute(&m)
 
-	if m.PSW.C != false {
+	if m.PSW.C {
 		t.Errorf("CPI: fC = %v, want false", m.PSW.C)
+	}
+	if m.PSW.Z {
+		t.Errorf("CPI: fZ = %v, want false", m.PSW.Z)
+	}
+	if m.PSW.S {
+		t.Errorf("CPI: fS = %v, want false", m.PSW.S)
+	}
+
+	m.Registers.A = 0x00
+	CPI(0x05).Execute(&m)
+	if m.PSW.Z {
+		t.Errorf("CPI: fZ = %v, want false", m.PSW.Z)
 	}
 }
 

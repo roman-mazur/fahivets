@@ -2,25 +2,6 @@ package arch
 
 import "fmt"
 
-func DecodeAllBytes(data []byte) (res []Instruction, err error) {
-	l := 0
-	for len(data) > 0 {
-		var (
-			ins Instruction
-			n   int
-		)
-		ins, n, err = DecodeBytes(data)
-		if err != nil {
-			err = fmt.Errorf("failed to decode instruction at pos %#x: %w", l, err)
-			return
-		}
-		data = data[n:]
-		l += n
-		res = append(res, ins)
-	}
-	return
-}
-
 func DecodeBytes(data []byte) (Instruction, int, error) {
 	switch cmdByte := data[0]; cmdByte {
 	case 0x00:
@@ -109,7 +90,7 @@ func DecodeBytes(data []byte) (Instruction, int, error) {
 		}
 		// Conditional call.
 		if cmdByte&0x7 == 0x4 && mask(cmdByte, 0xC0) {
-			cnd := (cmdByte & 0x38) >> 3
+			cnd := ConditionCode((cmdByte & 0x38) >> 3)
 			return Ccnd(cnd, nextWord(data)), 3, nil
 		}
 		// Compare with a register.
@@ -143,13 +124,13 @@ func DecodeBytes(data []byte) (Instruction, int, error) {
 				return PUSH(rp), 1, nil
 			}
 			// Conditional return.
-			cnd := (cmdByte >> 3) & 0x07
+			cnd := ConditionCode((cmdByte >> 3) & 0x07)
 			if cmdByte&0x07 == 0 {
 				return Rcnd(cnd), 1, nil
 			}
 			// Reset/interrupts.
 			if cmdByte&0x07 == 0x07 {
-				return RST(cnd), 1, nil
+				return RST(byte(cnd)), 1, nil
 			}
 			// Conditional jump.
 			if cmdByte&0x07 == 0x02 {

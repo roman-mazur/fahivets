@@ -18,6 +18,10 @@ func NewKeyboard(ctl IoController) *Keyboard {
 	return kb
 }
 
+func (kb *Keyboard) ShutDown() {
+	close(kb.events)
+}
+
 func (kb *Keyboard) Event(code KeyCode, state KeyState) {
 	kb.events <- keyEvent{code: code, state: state}
 }
@@ -54,7 +58,7 @@ const (
 type KeyCode byte
 
 func MatrixKeyCode(row, col int) KeyCode {
-	return KeyCode(byte(row&0x0F)<<4 | byte(col&0x0F))
+	return KeyCode(byte(col&0x0F)<<4 | byte(row&0x0F))
 }
 
 func (kc KeyCode) matrix() (r, c int) {

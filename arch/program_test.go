@@ -46,5 +46,5 @@ func TestBootloader(t *testing.T) {
 		}
 		t.Logf("0x%04x: %s\t%s", addr, cmd.Name, &m)
 	}
-	_ = m.Memory.Dump(tOut, 0xff00, 0xffff+1)
+	_ = m.Memory.Dump(tOut, 0xff00, 0xffff)
 }
