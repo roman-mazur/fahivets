@@ -24,26 +24,20 @@ const (
 )
 
 func InitIoController(m *CPU) *IoController {
-	addr := MemoryMapping(MemRegisters2K)
-	res := &IoController{
-		mem: m.Memory[addr : addr+4],
+	return &IoController{
+		mem: m.Memory[MemoryIoCtrl : MemoryIoCtrl+4],
 
 		a:  make(chan byte, 1),
 		b:  make(chan byte, 1),
 		cl: make(chan byte, 1),
 		ch: make(chan byte, 1),
 	}
-	if len(res.mem) != 4 {
-		panic("bad memory size")
-	}
-	return res
 }
 
 // Sync propagates values between the [CPU.Memory] and controlled device that integrates with the ports A/B/C.
 // It is supposed to be called in the routine that works with attached CPU.
 func (c *IoController) Sync() {
-	ctl := c.mem[controlFlags]
-	if mask(ctl, 0x80) {
+	if ctl := c.mem[controlFlags]; mask(ctl, 0x80) {
 		switch ioMode := (ctl >> 5) & 0x3; ioMode {
 		case 0:
 			c.syncSimpleIO(ctl)

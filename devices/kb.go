@@ -28,6 +28,11 @@ func (kb *Keyboard) Event(code KeyCode, state KeyState) {
 
 func (kb *Keyboard) run() {
 	var matrix kbMatrix
+
+	// Sync initial state.
+	kb.syncPorts(matrix.portValues())
+
+	// Process events.
 	for event := range kb.events {
 		if matrix.event(event) {
 			kb.syncPorts(matrix.portValues())

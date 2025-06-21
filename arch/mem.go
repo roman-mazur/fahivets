@@ -19,9 +19,11 @@ const (
 	MemRegisters2K
 
 	memSectionsCnt
+
+	MemoryIoCtrl = 0xff00
 )
 
-var memoryMapping = [memSectionsCnt]uint16{
+var memoryMapping = [memSectionsCnt]int{
 	MemUser16K:     0,
 	MemReserved16K: 0x4000,
 	MemUser4K:      0x8000,
@@ -32,15 +34,15 @@ var memoryMapping = [memSectionsCnt]uint16{
 }
 
 // MemoryMappingRange returns the start and end address of a particular memory section.
-func MemoryMappingRange(s MemSection) (start uint16, end uint16) {
+func MemoryMappingRange(s MemSection) (start int, end int) {
 	return memoryMapping[s], memoryMapping[(s+1)%memSectionsCnt] - 1
 }
 
 // MemoryMapping returns the start address of the selected memory section.
-func MemoryMapping(s MemSection) uint16 { return memoryMapping[s] }
+func MemoryMapping(s MemSection) int { return memoryMapping[s] }
 
-func (m *Memory) DumpSparse(out io.Writer) error {
-	for i := range m {
+func (m *Memory) DumpSparse(out io.Writer, start, end int) error {
+	for i := start; i < end; i++ {
 		if m[i] != 0 {
 			_, err := fmt.Fprintf(out, "%04x: 0x%02x\n", i, m[i])
 			if err != nil {
@@ -51,7 +53,7 @@ func (m *Memory) DumpSparse(out io.Writer) error {
 	return nil
 }
 
-func (m *Memory) Dump(out io.Writer, start, end uint16) error {
+func (m *Memory) Dump(out io.Writer, start, end int) error {
 	for i := start; i < end; i++ {
 		if (i-start)%16 == 0 {
 			_, err := fmt.Fprintf(out, "\n%04x:", i)

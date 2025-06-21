@@ -628,6 +628,7 @@ func LDA(addr uint16) Instruction {
 		Name:    fmt.Sprintf("LDA 0x%04x", addr),
 		Size:    3,
 		Execute: func(m *CPU) { m.Registers.A = m.Memory[addr] },
+		Encode:  func(out []byte) { out[0], out[1], out[2] = 0x3A, byte(addr&0xFF), byte(addr>>8) },
 	}
 }
 

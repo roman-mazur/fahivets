@@ -38,24 +38,21 @@ func TestKeyboard(t *testing.T) {
 
 	program := arch.Program{
 		// Program the IO controller.
-		arch.LXI(arch.RegisterPairHL, arch.MemoryMapping(arch.MemRegisters2K)+3), // Control byte.
+		arch.LXI(arch.RegisterPairHL, arch.MemoryIoCtrl+3), // Control byte.
 		arch.MVI(arch.RegisterSelMemory, 0x93),
 
 		// Check columns.
-		arch.LXI(arch.RegisterPairHL, arch.MemoryMapping(arch.MemRegisters2K)), // Port A.
-		arch.MOV(arch.RegisterSelA, arch.RegisterSelMemory),
+		arch.LDA(arch.MemoryIoCtrl), // Port A.
 		arch.CPI(0xDF),
 		arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
-		arch.LXI(arch.RegisterPairHL, arch.MemoryMapping(arch.MemRegisters2K)+2), // Port C.
-		arch.MOV(arch.RegisterSelA, arch.RegisterSelMemory),
-		arch.ANI(0x0F), // Lower part only.
+		arch.LDA(arch.MemoryIoCtrl + 2),    // Port C.
+		arch.ANI(0x0F),                     // Lower part only.
 		arch.CPI(0x0F),
 		arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
 
 		// Check rows.
-		arch.LXI(arch.RegisterPairHL, arch.MemoryMapping(arch.MemRegisters2K)+1), // Port B.
-		arch.MOV(arch.RegisterSelA, arch.RegisterSelMemory),
-		arch.ANI(0xFC), // Ignore first 2 bits.
+		arch.LDA(arch.MemoryIoCtrl + 1), // Port B.
+		arch.ANI(0xFC),                  // Ignore first 2 bits.
 		arch.CPI(0xBC),
 		arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
 

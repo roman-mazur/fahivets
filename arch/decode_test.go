@@ -1654,7 +1654,7 @@ func TestDecodeAndExecute(t *testing.T) {
 func dumpMemory(t *testing.T, m *CPU) {
 	t.Helper()
 	t.Log("memory:")
-	_ = m.Memory.DumpSparse(testutil.NewTestLogWriter(t))
+	_ = m.Memory.DumpSparse(testutil.NewTestLogWriter(t), 0, len(m.Memory))
 }
 
 func TestAllInstructions(t *testing.T) {

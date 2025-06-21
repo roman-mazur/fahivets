@@ -18,7 +18,7 @@ func TestIoController(t *testing.T) {
 	}
 
 	type portInfo struct {
-		offset uint16
+		offset int
 		recvF  func() byte
 		sendF  func(byte)
 	}

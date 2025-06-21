@@ -30,7 +30,7 @@ func (psw *PSW) String() string {
 	if psw.A {
 		v |= 0x10
 	}
-	return fmt.Sprintf("ZSPCA: %05b", v)
+	return fmt.Sprintf("ACPSZ: %05b", v)
 }
 
 type Registers struct {
