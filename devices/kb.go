@@ -26,6 +26,13 @@ func (kb *Keyboard) Event(code KeyCode, state KeyState) {
 	kb.events <- keyEvent{code: code, state: state}
 }
 
+func (kb *Keyboard) RunSequence(seq []KeyCode) {
+	for _, code := range seq {
+		kb.Event(code, KeyStateDown)
+		kb.Event(code, KeyStateUp)
+	}
+}
+
 func (kb *Keyboard) run() {
 	var matrix kbMatrix
 

@@ -8,6 +8,7 @@ import (
 type Computer struct {
 	CPU      arch.CPU
 	Keyboard *devices.Keyboard
+	Display  *devices.Display
 
 	ioCtl         *arch.IoController
 	portBComposer *devices.PortComposer
@@ -25,6 +26,8 @@ func NewComputer() *Computer {
 		PortB:    c.portBComposer.MaskedSend(0xFC),
 		PortCLow: c.ioCtl.SendCLow,
 	})
+
+	c.Display = devices.NewDisplay(&c.CPU)
 	return &c
 }
 

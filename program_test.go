@@ -11,7 +11,6 @@ import (
 
 	"rmazur.io/fahivets"
 	"rmazur.io/fahivets/arch"
-	"rmazur.io/fahivets/devices"
 	"rmazur.io/fahivets/internal/testutil"
 )
 
@@ -33,10 +32,11 @@ func TestBootloader(t *testing.T) {
 	monitorProg := readData(t, "progs/monitor.rom")
 
 	romStart := arch.MemoryMapping(arch.MemROM2K)
+	monitorStart := arch.MemoryMapping(arch.MemROMExtra12K)
 
 	m := fahivets.NewComputer()
 	copy(m.CPU.Memory[romStart:], bootProg)
-	copy(m.CPU.Memory[romStart+0x830:], monitorProg)
+	copy(m.CPU.Memory[monitorStart:], monitorProg)
 	m.CPU.PC = uint16(romStart)
 
 	tOut := testutil.NewTestLogWriter(t)
@@ -54,7 +54,7 @@ func TestBootloader(t *testing.T) {
 			_ = m.CPU.Memory.DumpSparse(tOut, 0, len(m.CPU.Memory))
 			t.Fatal(err)
 		}
-		if debug || strings.Contains(cmd.Name, "0xff") || m.CPU.Registers.H == 0xFF || i > maxSteps-100 {
+		if debug && (strings.Contains(cmd.Name, "0xff") || m.CPU.Registers.H == 0xFF || i > maxSteps-100) {
 			t.Logf("%05d 0x%04x: %s\t%s", i, addr, cmd.Name, &m.CPU)
 		}
 	}
@@ -67,7 +67,7 @@ func TestBootloader(t *testing.T) {
 	_ = m.CPU.Memory.DumpSparse(tOut, displayStart, displayEnd+1)
 
 	var outImg bytes.Buffer
-	err := png.Encode(&outImg, devices.NewDisplay(&m.CPU).Image())
+	err := png.Encode(&outImg, m.Display.Image())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,5 +84,38 @@ func TestBootloader(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+
+	t.Log("Running monitor")
+	m.CPU.PC = uint16(monitorStart)
+
+	for i := range maxSteps * 5 {
+		addr := m.CPU.PC
+		cmd, err := m.Step()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i > maxSteps*5-500 {
+			t.Logf("%05d 0x%04x: %s\t%s", i, addr, cmd.Name, &m.CPU)
+		}
+	}
+	storeImage(t, m, "test.png")
+}
+
+func storeImage(t *testing.T, m *fahivets.Computer, name string) {
+	t.Helper()
+	f, err := os.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := f.Close(); err != nil {
+			t.Error("cannot close the output file:", err)
+		}
+	})
+
+	err = png.Encode(f, m.Display.Image())
+	if err != nil {
+		t.Error(err)
 	}
 }

@@ -30,7 +30,7 @@ func main() {
 	// programs directly to the CPU.Memory.
 	romStart := arch.MemoryMapping(arch.MemROM2K)
 	copy(m.CPU.Memory[romStart:], bootloader)
-	copy(m.CPU.Memory[romStart+0x830:], monitor)
+	copy(m.CPU.Memory[arch.MemoryMapping(arch.MemROMExtra12K):], monitor)
 	m.CPU.PC = uint16(romStart)
 
 	for {
