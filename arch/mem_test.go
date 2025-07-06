@@ -7,7 +7,7 @@ func TestMemoryMapping(t *testing.T) {
 	if regStart != 0xF800 {
 		t.Errorf("memory mapping failed: got 0x%X, want 0xF800", regStart)
 	}
-	if regEnd != 0xFFFF {
-		t.Errorf("memory mapping failed: got 0x%X, want 0xFFFF", regEnd)
+	if uint16(regEnd) != 0xFFFF {
+		t.Errorf("memory mapping failed: got 0x%X, want 0xFFFF", uint16(regEnd))
 	}
 }

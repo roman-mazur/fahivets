@@ -10,7 +10,7 @@ func TestIoController(t *testing.T) {
 		ioc = InitIoController(&cpu)
 	)
 
-	baseAddress := MemoryMapping(MemRegisters2K)
+	baseAddress := MemoryIoCtrl
 
 	type commValue struct {
 		name string

@@ -6,11 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"runtime"
 	"testing"
 
 	"rmazur.io/fahivets"
 	"rmazur.io/fahivets/arch"
+	"rmazur.io/fahivets/devices"
 	"rmazur.io/fahivets/internal/testutil"
 )
 
@@ -41,23 +42,9 @@ func TestBootloader(t *testing.T) {
 
 	tOut := testutil.NewTestLogWriter(t)
 
-	const (
-		debug    = false
-		maxSteps = 16_000
-	)
+	const maxSteps = 16_000
 
-	for i := range maxSteps {
-		addr := m.CPU.PC
-		cmd, err := m.Step()
-		if err != nil {
-			t.Logf("%05d 0x%04x:\t%s", i, addr, &m.CPU)
-			_ = m.CPU.Memory.DumpSparse(tOut, 0, len(m.CPU.Memory))
-			t.Fatal(err)
-		}
-		if debug && (strings.Contains(cmd.Name, "0xff") || m.CPU.Registers.H == 0xFF || i > maxSteps-100) {
-			t.Logf("%05d 0x%04x: %s\t%s", i, addr, cmd.Name, &m.CPU)
-		}
-	}
+	advance(t, m, maxSteps, false)
 
 	t.Log("IO")
 	_ = m.CPU.Memory.Dump(tOut, arch.MemoryIoCtrl, arch.MemoryIoCtrl+64)
@@ -89,20 +76,41 @@ func TestBootloader(t *testing.T) {
 	t.Log("Running monitor")
 	m.CPU.PC = uint16(monitorStart)
 
-	for i := range maxSteps * 5 {
+	advance(t, m, maxSteps*5, false)
+	captureDisplay(t, m, "test.png")
+
+	// 0xc269
+	t.Log("check keypress subroutine")
+	m.CPU.PC = 0xc269
+	keyCode := devices.MatrixKeyCode(3, 3)
+	m.Keyboard.Event(keyCode, devices.KeyStateDown)
+	runtime.Gosched()
+	advance(t, m, 9, true)
+	m.Keyboard.Event(keyCode, devices.KeyStateUp)
+	runtime.Gosched()
+	t.Log("key is up")
+	advance(t, m, 255*80, true)
+}
+
+func advance(t *testing.T, m *fahivets.Computer, steps int, debug bool) {
+	t.Helper()
+	t.Logf("advancing by %d steps", steps)
+	tOut := testutil.NewTestLogWriter(t)
+	for i := range steps {
 		addr := m.CPU.PC
 		cmd, err := m.Step()
 		if err != nil {
+			t.Logf("%05d 0x%04x:\t%s", i, addr, &m.CPU)
+			_ = m.CPU.Memory.DumpSparse(tOut, 0, len(m.CPU.Memory))
 			t.Fatal(err)
 		}
-		if i > maxSteps*5-500 {
+		if debug {
 			t.Logf("%05d 0x%04x: %s\t%s", i, addr, cmd.Name, &m.CPU)
 		}
 	}
-	storeImage(t, m, "test.png")
 }
 
-func storeImage(t *testing.T, m *fahivets.Computer, name string) {
+func captureDisplay(t *testing.T, m *fahivets.Computer, name string) {
 	t.Helper()
 	f, err := os.Create(name)
 	if err != nil {
@@ -118,4 +126,5 @@ func storeImage(t *testing.T, m *fahivets.Computer, name string) {
 	if err != nil {
 		t.Error(err)
 	}
+	t.Log("display captured in", name)
 }

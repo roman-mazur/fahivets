@@ -598,9 +598,9 @@ func INR(r byte) Instruction {
 		Execute: func(m *CPU) {
 			reg, mem := m.selectOperand(r)
 			if mem != nil {
-				addDst(m, &mem[0], 1, true)
+				addDst(m, &mem[0], 1, false)
 			} else {
-				addDst(m, reg, 1, true)
+				addDst(m, reg, 1, false)
 			}
 		},
 	}
