@@ -22,7 +22,7 @@ func NewComputer() *Computer {
 
 	c.Keyboard = devices.NewKeyboard(&devices.ComposedIoController{
 		PortA: c.ioCtl.SendA,
-		// Keyboard is not connected to lower 2 bites.
+		// Keyboard is not connected to lower 2 bits.
 		PortB:    c.portBComposer.MaskedSend(0xFC),
 		PortCLow: c.ioCtl.SendCLow,
 	})

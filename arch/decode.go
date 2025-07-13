@@ -1,6 +1,25 @@
 package arch
 
-import "fmt"
+import (
+	"fmt"
+)
+
+func DecodeBytesAll(data []byte) (Program, int, error) {
+	var (
+		prg   Program
+		total int
+	)
+	for len(data) > 0 {
+		cmd, n, err := DecodeBytes(data)
+		total += n
+		if err != nil {
+			return prg, total, err
+		}
+		prg.Instructions = append(prg.Instructions, cmd)
+		data = data[n:]
+	}
+	return prg, total, nil
+}
 
 func DecodeBytes(data []byte) (Instruction, int, error) {
 	switch cmdByte := data[0]; cmdByte {

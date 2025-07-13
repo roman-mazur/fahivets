@@ -218,13 +218,21 @@ type Instruction struct {
 	Encode  func(out []byte)
 }
 
-type Program []Instruction
+type Program struct {
+	Instructions []Instruction
+	StartAddress int
+}
 
 func (p Program) String() string {
-	var out bytes.Buffer
-	for _, cmd := range p {
+	var (
+		out  bytes.Buffer
+		addr = p.StartAddress
+	)
+	for _, cmd := range p.Instructions {
+		out.WriteString(fmt.Sprintf("%04x ", addr))
 		out.WriteString(cmd.Name)
 		out.WriteByte('\n')
+		addr += int(cmd.Size)
 	}
 	return out.String()
 }

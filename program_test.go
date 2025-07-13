@@ -128,3 +128,15 @@ func captureDisplay(t *testing.T, m *fahivets.Computer, name string) {
 	}
 	t.Log("display captured in", name)
 }
+
+func TestPrograms(t *testing.T) {
+	bootProg := readData(t, "progs/bootloader.rom")
+	prog, n, err := arch.DecodeBytesAll(bootProg)
+	prog.StartAddress = arch.MemoryMapping(arch.MemROM2K)
+	t.Log(prog, n, err)
+
+	monitorProg := readData(t, "progs/monitor.rom")
+	prog, n, err = arch.DecodeBytesAll(monitorProg)
+	prog.StartAddress = arch.MemoryMapping(arch.MemROMExtra12K)
+	t.Log(prog, n, err)
+}
