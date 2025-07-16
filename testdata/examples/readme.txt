@@ -1,0 +1,1 @@
+Place for the images generated during the tests.
