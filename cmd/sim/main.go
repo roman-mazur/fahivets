@@ -6,7 +6,6 @@ import (
 	"net/http"
 )
 
-//go:generate bash -c ""
 //go:generate bash ./build-wasm.sh
 
 func main() {

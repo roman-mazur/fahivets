@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"image"
 	"image/color"
@@ -22,6 +23,9 @@ var (
 	//go:embed progs/monitor.rom
 	monitor []byte
 
+	//go:embed progs/rain.rks
+	rainRks []byte
+
 	m = fahivets.NewComputer()
 )
 
@@ -32,6 +36,12 @@ func main() {
 	copy(m.CPU.Memory[romStart:], bootloader)
 	copy(m.CPU.Memory[arch.MemoryMapping(arch.MemROMExtra12K):], monitor)
 	m.CPU.PC = uint16(romStart)
+
+	rainProg, err := fahivets.ReadRks(bytes.NewReader(rainRks))
+	if err != nil {
+		panic(err)
+	}
+	rainLoaded := false
 
 	for {
 		const maxSteps = 16_000
@@ -51,6 +61,12 @@ func main() {
 		img := convertRGBA(devices.NewDisplay(&m.CPU).Image())
 		renderDisplayImage(img)
 		time.Sleep(100 * time.Millisecond)
+
+		if !rainLoaded {
+			copy(m.CPU.Memory[rainProg.StartAddress:], rainProg.Content)
+			rainLoaded = true
+			m.CPU.Exec(arch.JMP(rainProg.StartAddress))
+		}
 	}
 }
 
