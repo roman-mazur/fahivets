@@ -210,10 +210,10 @@ c171 PUSH BC
 c172 LHLD 0x8ff1
 c175 MVI A, 0x0b // io inputs: B,CHigh,CLow
 c177 STA 0xff03
-c17a CALL 0xc18f // wait
+c17a CALL 0xc18f // wait: loopL
 c17d MVI A, 0x0a // io inputs: B,CHigh
 c17f STA 0xff03
-c182 CALL 0xc18f // wait
+c182 CALL 0xc18f // wait: loopL
 c185 DCR H
 c186 JCnd Z 0xc175
 c189 NOP
