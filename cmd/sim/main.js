@@ -1,7 +1,7 @@
 const go = new Go();
 
 const fetchMain = WebAssembly.instantiateStreaming(
-  fetch("main.wasm?v=2"),
+  fetch("main.wasm?v=3"),
   go.importObject
 );
 

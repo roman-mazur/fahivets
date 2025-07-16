@@ -12,6 +12,7 @@ import (
 	"time"
 	"unsafe"
 
+	"golang.org/x/image/draw"
 	"rmazur.io/fahivets"
 	"rmazur.io/fahivets/arch"
 	"rmazur.io/fahivets/devices"
@@ -43,6 +44,8 @@ func main() {
 	}
 	rainLoaded := false
 
+	var scaledBuf *image.RGBA
+
 	for {
 		const maxSteps = 16_000
 		for range maxSteps {
@@ -58,15 +61,20 @@ func main() {
 			}
 		}
 
-		img := convertRGBA(devices.NewDisplay(&m.CPU).Image())
-		renderDisplayImage(img)
-		time.Sleep(100 * time.Millisecond)
+		frame := m.Display.Image()
+		if scaledBuf == nil {
+			size := frame.Bounds()
+			scaledBuf = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
+		}
+		renderDisplayImage(scaledBuf, frame)
 
 		if !rainLoaded {
 			copy(m.CPU.Memory[rainProg.StartAddress:], rainProg.Content)
 			rainLoaded = true
 			m.CPU.Exec(arch.JMP(rainProg.StartAddress))
 		}
+
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -81,10 +89,11 @@ func convertRGBA(src image.Image) *image.RGBA {
 	return res
 }
 
-func renderDisplayImage(img *image.RGBA) {
-	size := img.Bounds().Size()
-	ptr := uintptr(unsafe.Pointer(&img.Pix[0]))
-	js.Global().Call("renderDisplay", ptr, len(img.Pix), size.X, size.Y)
+func renderDisplayImage(buf *image.RGBA, src image.Image) {
+	draw.NearestNeighbor.Scale(buf, buf.Bounds(), src, src.Bounds(), draw.Src, nil)
+	ptr := uintptr(unsafe.Pointer(&buf.Pix[0]))
+	size := buf.Bounds().Size()
+	js.Global().Call("renderDisplay", ptr, len(buf.Pix), size.X, size.Y)
 }
 
 func nextKeyboardEvent() (present bool, keyCode devices.KeyCode, state devices.KeyState) {
