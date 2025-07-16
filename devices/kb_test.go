@@ -37,37 +37,39 @@ func TestKeyboard(t *testing.T) {
 	userMemStart, userMemEnd := arch.MemoryMappingRange(arch.MemUser16K)
 
 	program := arch.Program{
-		// Program the IO controller.
-		arch.LXI(arch.RegisterPairHL, arch.MemoryIoCtrl+3), // Control byte.
-		arch.MVI(arch.RegisterSelMemory, 0x93),
+		Instructions: []arch.Instruction{
+			// Program the IO controller.
+			arch.LXI(arch.RegisterPairHL, arch.MemoryIoCtrl+3), // Control byte.
+			arch.MVI(arch.RegisterSelMemory, 0x93),
 
-		// Check columns.
-		arch.LDA(arch.MemoryIoCtrl), // Port A.
-		arch.CPI(0xDF),
-		arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
-		arch.LDA(arch.MemoryIoCtrl + 2),    // Port C.
-		arch.ANI(0x0F),                     // Lower part only.
-		arch.CPI(0x0F),
-		arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
+			// Check columns.
+			arch.LDA(arch.MemoryIoCtrl), // Port A.
+			arch.CPI(0xDF),
+			arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
+			arch.LDA(arch.MemoryIoCtrl + 2),    // Port C.
+			arch.ANI(0x0F),                     // Lower part only.
+			arch.CPI(0x0F),
+			arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
 
-		// Check rows.
-		arch.LDA(arch.MemoryIoCtrl + 1), // Port B.
-		arch.ANI(0xFC),                  // Ignore first 2 bits.
-		arch.CPI(0xBC),
-		arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
+			// Check rows.
+			arch.LDA(arch.MemoryIoCtrl + 1), // Port B.
+			arch.ANI(0xFC),                  // Ignore first 2 bits.
+			arch.CPI(0xBC),
+			arch.JCnd(arch.ConditionCodeNZ, 0), // Loop if no match.
 
-		// Indicate the success.
-		arch.LXI(arch.RegisterPairHL, userMemEnd-1),
-		arch.MVI(arch.RegisterSelMemory, 1),
+			// Indicate the success.
+			arch.LXI(arch.RegisterPairHL, uint16(userMemEnd-1)),
+			arch.MVI(arch.RegisterSelMemory, 1),
 
-		// NOP loop.
-		arch.NOP(),
-		arch.JMP(0), // Placeholder.
+			// NOP loop.
+			arch.NOP(),
+			arch.JMP(0), // Placeholder.
+		},
 	}
-	program[len(program)-1] = arch.JMP(uint16(len(program) - 2))
-	t.Logf("Program (%d instructions):\n%s", len(program), program)
+	program.Instructions[len(program.Instructions)-1] = arch.JMP(uint16(len(program.Instructions) - 2))
+	t.Logf("Program (%d instructions):\n%s", len(program.Instructions), program)
 
-	arch.EncodeInstructions(program, cpu.Memory[userMemStart:userMemEnd/2])
+	arch.EncodeInstructions(program.Instructions, cpu.Memory[userMemStart:userMemEnd/2])
 
 	ioFinished := false
 
