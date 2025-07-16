@@ -6,7 +6,6 @@ import (
 	"bytes"
 	_ "embed"
 	"image"
-	"image/color"
 	"log"
 	"syscall/js"
 	"time"
@@ -31,6 +30,15 @@ var (
 )
 
 func main() {
+	frames := make(chan *image.RGBA, 1)
+	go runSimulation(m, frames)
+	jsSetupAnimationFrames(frames, m.Keyboard)
+
+	var done chan struct{}
+	<-done
+}
+
+func runSimulation(m *fahivets.Computer, frames chan *image.RGBA) {
 	// Note: it should be possible to minimize the exe size if we link
 	// programs directly to the CPU.Memory.
 	romStart := arch.MemoryMapping(arch.MemROM2K)
@@ -44,7 +52,7 @@ func main() {
 	}
 	rainLoaded := false
 
-	var scaledBuf *image.RGBA
+	var scaledBufEdit, scaleBufSent *image.RGBA
 
 	for {
 		const maxSteps = 16_000
@@ -55,18 +63,21 @@ func main() {
 				return
 			}
 
-			kbEvent, keyCode, keyState := nextKeyboardEvent()
-			if kbEvent {
-				m.Keyboard.Event(keyCode, keyState)
-			}
 		}
 
 		frame := m.Display.Image()
-		if scaledBuf == nil {
+		if scaledBufEdit == nil {
 			size := frame.Bounds()
-			scaledBuf = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
+			scaledBufEdit = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
+			scaleBufSent = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
 		}
-		renderDisplayImage(scaledBuf, frame)
+		draw.NearestNeighbor.Scale(scaledBufEdit, scaledBufEdit.Bounds(), frame, frame.Bounds(), draw.Src, nil)
+		// Flip the frame buffers.
+		select {
+		case frames <- scaleBufSent:
+			scaledBufEdit, scaleBufSent = scaleBufSent, scaledBufEdit
+		default:
+		}
 
 		if !rainLoaded {
 			copy(m.CPU.Memory[rainProg.StartAddress:], rainProg.Content)
@@ -74,23 +85,32 @@ func main() {
 			m.CPU.Exec(arch.JMP(rainProg.StartAddress))
 		}
 
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond) // TODO: Replace with proper clock.
 	}
 }
 
-func convertRGBA(src image.Image) *image.RGBA {
-	bounds := src.Bounds()
-	res := image.NewRGBA(bounds)
-	for x := bounds.Min.X; x < bounds.Max.X; x++ {
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			res.Set(x, y, color.RGBAModel.Convert(src.At(x, y)))
+func jsSetupAnimationFrames(frames chan *image.RGBA, keyboard *devices.Keyboard) {
+	var jsHandler js.Func
+	jsHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		select {
+		case frame := <-frames:
+			renderDisplayImage(frame)
+		default:
 		}
-	}
-	return res
+
+		kbEvent, keyCode, keyState := nextKeyboardEvent()
+		if kbEvent {
+			log.Println("kb event", keyCode, keyState)
+			m.Keyboard.Event(keyCode, keyState)
+		}
+
+		js.Global().Call("requestAnimationFrame", jsHandler)
+		return nil
+	})
+	js.Global().Call("requestAnimationFrame", jsHandler)
 }
 
-func renderDisplayImage(buf *image.RGBA, src image.Image) {
-	draw.NearestNeighbor.Scale(buf, buf.Bounds(), src, src.Bounds(), draw.Src, nil)
+func renderDisplayImage(buf *image.RGBA) {
 	ptr := uintptr(unsafe.Pointer(&buf.Pix[0]))
 	size := buf.Bounds().Size()
 	js.Global().Call("renderDisplay", ptr, len(buf.Pix), size.X, size.Y)
