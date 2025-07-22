@@ -8,8 +8,6 @@ import (
 	"image"
 	"log"
 	"syscall/js"
-	"time"
-	"unsafe"
 
 	"golang.org/x/image/draw"
 	"rmazur.io/fahivets"
@@ -30,15 +28,27 @@ var (
 )
 
 func main() {
-	frames := make(chan *image.RGBA, 1)
-	go runSimulation(m, frames)
-	jsSetupAnimationFrames(frames, m.Keyboard)
+	var ui UiWorld
+
+	ui = &jsUiWorld{root: js.Global()}
+	newFrames := make(chan image.Image, 1)
+	processedFrames := make(chan image.Image)
+
+	go runSimulation(m, newFrames, processedFrames)
+
+	ui.ConsumeDisplayFrames(newFrames, processedFrames)
+	ui.ConnectKeyboard(m.Keyboard)
 
 	var done chan struct{}
 	<-done
 }
 
-func runSimulation(m *fahivets.Computer, frames chan *image.RGBA) {
+type UiWorld interface {
+	ConsumeDisplayFrames(newFrames, processedFrames chan image.Image)
+	ConnectKeyboard(keyboard *devices.Keyboard)
+}
+
+func runSimulation(m *fahivets.Computer, newFrames, processedFrames chan image.Image) {
 	// Note: it should be possible to minimize the exe size if we link
 	// programs directly to the CPU.Memory.
 	romStart := arch.MemoryMapping(arch.MemROM2K)
@@ -46,88 +56,69 @@ func runSimulation(m *fahivets.Computer, frames chan *image.RGBA) {
 	copy(m.CPU.Memory[arch.MemoryMapping(arch.MemROMExtra12K):], monitor)
 	m.CPU.PC = uint16(romStart)
 
+	// Make sure bootloader is executed.
+	for range 16_000 {
+		_, err := m.Step()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	}
+
+	// Load the rain game.
 	rainProg, err := fahivets.ReadRks(bytes.NewReader(rainRks))
 	if err != nil {
 		panic(err)
 	}
-	rainLoaded := false
+	copy(m.CPU.Memory[rainProg.StartAddress:], rainProg.Content)
+	m.CPU.Exec(arch.JMP(rainProg.StartAddress))
 
-	var scaledBufEdit, scaleBufSent *image.RGBA
-
+	var dp displayPipeline
 	for {
-		const maxSteps = 16_000
-		for range maxSteps {
-			_, err := m.Step()
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
+		_, err := m.Step()
+		if err != nil {
+			log.Println(err)
+			return
 		}
-
-		frame := m.Display.Image()
-		if scaledBufEdit == nil {
-			size := frame.Bounds()
-			scaledBufEdit = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
-			scaleBufSent = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
-		}
-		draw.NearestNeighbor.Scale(scaledBufEdit, scaledBufEdit.Bounds(), frame, frame.Bounds(), draw.Src, nil)
-		// Flip the frame buffers.
-		select {
-		case frames <- scaleBufSent:
-			scaledBufEdit, scaleBufSent = scaleBufSent, scaledBufEdit
-		default:
-		}
-
-		if !rainLoaded {
-			copy(m.CPU.Memory[rainProg.StartAddress:], rainProg.Content)
-			rainLoaded = true
-			m.CPU.Exec(arch.JMP(rainProg.StartAddress))
-		}
-
-		time.Sleep(10 * time.Millisecond) // TODO: Replace with proper clock.
+		dp.Advance(newFrames, processedFrames, m.Display)
+		m.SimSleep()
 	}
 }
 
-func jsSetupAnimationFrames(frames chan *image.RGBA, keyboard *devices.Keyboard) {
-	var jsHandler js.Func
-	jsHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		select {
-		case frame := <-frames:
-			renderDisplayImage(frame)
-		default:
-		}
-
-		kbEvent, keyCode, keyState := nextKeyboardEvent()
-		if kbEvent {
-			log.Println("kb event", keyCode, keyState)
-			m.Keyboard.Event(keyCode, keyState)
-		}
-
-		js.Global().Call("requestAnimationFrame", jsHandler)
-		return nil
-	})
-	js.Global().Call("requestAnimationFrame", jsHandler)
+type displayPipeline struct {
+	init bool
+	buf  *image.RGBA
 }
 
-func renderDisplayImage(buf *image.RGBA) {
-	ptr := uintptr(unsafe.Pointer(&buf.Pix[0]))
-	size := buf.Bounds().Size()
-	js.Global().Call("renderDisplay", ptr, len(buf.Pix), size.X, size.Y)
+func (dp *displayPipeline) Advance(newFrames, processedFrames chan image.Image, display *devices.Display) {
+	dp.ensureBuffers(display)
+
+	var out, in chan image.Image
+	if dp.buf != nil {
+		out = newFrames
+	} else {
+		in = processedFrames
+	}
+	select {
+	case out <- dp.buf:
+		dp.buf = nil
+	case buf := <-in:
+		dp.buf = buf.(*image.RGBA)
+		dp.fillBuf(display.Image())
+	default:
+	}
 }
 
-func nextKeyboardEvent() (present bool, keyCode devices.KeyCode, state devices.KeyState) {
-	const bufferName = "kbEventsBuffer"
-	buffer := js.Global().Get(bufferName)
-	if buffer.Length() == 0 {
-		return
+func (dp *displayPipeline) ensureBuffers(display *devices.Display) {
+	if !dp.init {
+		dp.init = true
+		frame := display.Image()
+		size := frame.Bounds()
+		dp.buf = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
+		dp.fillBuf(frame)
 	}
-	event := buffer.Call("shift")
-	code, down := event.Get("code").String(), event.Get("down").Bool()
-	if keyCode, present = jsKeyCodes[code]; present {
-		if down {
-			state = devices.KeyStateDown
-		}
-	}
-	return
+}
+
+func (dp *displayPipeline) fillBuf(frame image.Image) {
+	draw.NearestNeighbor.Scale(dp.buf, dp.buf.Bounds(), frame, frame.Bounds(), draw.Src, nil)
 }

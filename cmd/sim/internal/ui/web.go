@@ -1,6 +1,86 @@
+//go:build js
+
 package main
 
-import "rmazur.io/fahivets/devices"
+import (
+	"image"
+	"log"
+	"syscall/js"
+	"unsafe"
+
+	"rmazur.io/fahivets/devices"
+)
+
+type jsUiWorld struct {
+	root js.Value
+}
+
+func (w *jsUiWorld) ConsumeDisplayFrames(newFrames, processedFrames chan image.Image) {
+	const callName = "requestAnimationFrame"
+
+	var jsHandler js.Func
+	jsHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		frame := <-newFrames
+		renderDisplayImage(imageToRGBA(frame))
+		processedFrames <- frame
+
+		w.root.Call(callName, jsHandler)
+		return nil
+	})
+
+	w.root.Call(callName, jsHandler)
+}
+
+func (w *jsUiWorld) ConnectKeyboard(keyboard *devices.Keyboard) {
+	log.Println("Connecting keyboard...")
+
+	docEl := w.root.Get("document").Get("documentElement")
+	const callName = "addEventListener"
+	docEl.Call(callName, "keydown", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		handleKeyboardEvent(jsEventCode(args), true, keyboard)
+		return nil
+	}))
+	docEl.Call(callName, "keyup", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		handleKeyboardEvent(jsEventCode(args), false, keyboard)
+		return nil
+	}))
+}
+
+func jsEventCode(args []js.Value) string { return args[0].Get("code").String() }
+
+func handleKeyboardEvent(code string, down bool, keyboard *devices.Keyboard) {
+	if keyCode, present := jsKeyCodes[code]; present {
+		state := devices.KeyStateUp
+		if down {
+			state = devices.KeyStateDown
+		}
+		log.Printf("code %s, keycode %v, state %v", code, keyCode, state)
+		keyboard.Event(keyCode, state)
+	} else if down {
+		log.Println("no keyboard mapping for", code)
+	}
+}
+
+func renderDisplayImage(buf *image.RGBA) {
+	ptr := uintptr(unsafe.Pointer(&buf.Pix[0]))
+	size := buf.Bounds().Size()
+	js.Global().Call("renderDisplay", ptr, len(buf.Pix), size.X, size.Y)
+}
+
+func imageToRGBA(img image.Image) *image.RGBA {
+	rgba, ok := img.(*image.RGBA)
+	if ok {
+		return rgba
+	}
+
+	rgba = image.NewRGBA(img.Bounds())
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			rgba.Set(x, y, img.At(x, y))
+		}
+	}
+	return rgba
+}
 
 var jsKeyCodes = map[string]devices.KeyCode{
 	"F1":  devices.MatrixKeyCode(5, 11),

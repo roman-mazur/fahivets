@@ -60,21 +60,22 @@ func (m *CPU) String() string {
 	return fmt.Sprintf("%s %s PC:%04x SP:%04x", &m.Registers, &m.PSW, m.PC, m.SP)
 }
 
-func (m *CPU) Exec(ins Instruction) {
+func (m *CPU) Exec(ins Instruction) int {
 	pc := m.PC
-	ins.Execute(m)
+	cycles := ins.Execute(m)
 	if pc == m.PC {
 		m.PC += uint16(ins.Size)
 	}
+	return cycles
 }
 
-func (m *CPU) Step() (Instruction, error) {
+func (m *CPU) Step() (Instruction, int, error) {
 	cmd, _, err := DecodeBytes(m.Memory[m.PC:])
 	if err != nil {
-		return cmd, err
+		return cmd, 0, err
 	}
-	m.Exec(cmd)
-	return cmd, nil
+	c := m.Exec(cmd)
+	return cmd, c, nil
 }
 
 func (m *CPU) psw() byte {
@@ -214,7 +215,7 @@ func (m *CPU) pop16() uint16 {
 type Instruction struct {
 	Name    string
 	Size    byte
-	Execute func(m *CPU)
+	Execute func(m *CPU) int
 	Encode  func(out []byte)
 }
 

@@ -79,7 +79,7 @@ func TestKeyboard(t *testing.T) {
 			return
 		}
 
-		cmd, err := cpu.Step()
+		cmd, _, err := cpu.Step()
 		if err != nil {
 			t.Fatal(err)
 		}

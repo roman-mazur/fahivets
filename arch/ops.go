@@ -47,36 +47,48 @@ func incA(m *CPU, v int16, doCarry bool) { addDst(m, &m.Registers.A, v, doCarry)
 // ACI implements the ACI instruction (Add to Accumulator with Carry).
 func ACI(data byte) Instruction {
 	return Instruction{
-		Name:    fmt.Sprintf("ACI 0x%02x", data),
-		Size:    2,
-		Execute: func(m *CPU) { incA(m, int16(data), true) },
+		Name: fmt.Sprintf("ACI 0x%02x", data),
+		Size: 2,
+		Execute: func(m *CPU) int {
+			incA(m, int16(data), true)
+			return 2
+		},
 	}
 }
 
 // ADC implements the ADC instruction (Add Register or Memory to Accumulator with Carry).
 func ADC(r byte) Instruction {
 	return Instruction{
-		Name:    fmt.Sprintf("ADC %s", RegisterCode(r)),
-		Size:    1,
-		Execute: func(m *CPU) { incA(m, lookup8(m.selectOperand(r)), true) },
+		Name: fmt.Sprintf("ADC %s", RegisterCode(r)),
+		Size: 1,
+		Execute: func(m *CPU) int {
+			incA(m, lookup8(m.selectOperand(r)), true)
+			return 2
+		},
 	}
 }
 
 // ADD implements the ADD instruction (Add Register or Memory to Accumulator).
 func ADD(r byte) Instruction {
 	return Instruction{
-		Name:    fmt.Sprintf("ADD %s", RegisterCode(r)),
-		Size:    1,
-		Execute: func(m *CPU) { incA(m, lookup8(m.selectOperand(r)), false) },
+		Name: fmt.Sprintf("ADD %s", RegisterCode(r)),
+		Size: 1,
+		Execute: func(m *CPU) int {
+			incA(m, lookup8(m.selectOperand(r)), false)
+			return 2
+		},
 	}
 }
 
 // ADI implements the ADI instruction (Add Immediate to Accumulator).
 func ADI(data byte) Instruction {
 	return Instruction{
-		Name:    fmt.Sprintf("ADI 0x%02x", data),
-		Size:    2,
-		Execute: func(m *CPU) { incA(m, int16(data), false) },
+		Name: fmt.Sprintf("ADI 0x%02x", data),
+		Size: 2,
+		Execute: func(m *CPU) int {
+			incA(m, int16(data), false)
+			return 2
+		},
 	}
 }
 
@@ -99,7 +111,7 @@ func ANA(r byte) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("ANA %s", RegisterCode(r)),
 		Size:    1,
-		Execute: func(m *CPU) { andA(m, byte(lookup8(m.selectOperand(r)))) },
+		Execute: func(m *CPU) int { andA(m, byte(lookup8(m.selectOperand(r)))); return 2 },
 	}
 }
 
@@ -108,7 +120,7 @@ func ANI(data byte) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("ANI 0x%02x", data),
 		Size:    2,
-		Execute: func(m *CPU) { andA(m, data) },
+		Execute: func(m *CPU) int { andA(m, data); return 2 },
 		Encode:  func(out []byte) { out[0], out[1] = 0xE6, data },
 	}
 }
@@ -118,9 +130,10 @@ func CALL(addr uint16) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("CALL 0x%04x", addr),
 		Size: 3,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.push16(m.PC + 3) // Push return address
 			m.PC = addr        // Jump to subroutine
+			return 5
 		},
 	}
 }
@@ -130,11 +143,13 @@ func Ccnd(cnd ConditionCode, addr uint16) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("Ccnd %s 0x%04x", cnd, addr),
 		Size: 3,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			if cnd.Check(m) {
 				m.push16(m.PC + 3)
 				m.PC = addr
+				return 5
 			}
+			return 3
 		},
 		Encode: func(out []byte) {
 			out[0], out[1], out[2] = 0xC6|(byte(cnd)<<3), byte(addr&0xFF), byte((addr>>8)&0xFF)
@@ -145,22 +160,18 @@ func Ccnd(cnd ConditionCode, addr uint16) Instruction {
 // CMA implements the CMA instruction (Complement Accumulator).
 func CMA() Instruction {
 	return Instruction{
-		Name: "CMA",
-		Size: 1,
-		Execute: func(m *CPU) {
-			m.Registers.A = ^m.Registers.A
-		},
+		Name:    "CMA",
+		Size:    1,
+		Execute: func(m *CPU) int { m.Registers.A = ^m.Registers.A; return 1 },
 	}
 }
 
 // CMC implements the CMC instruction (Complement Carry).
 func CMC() Instruction {
 	return Instruction{
-		Name: "CMC",
-		Size: 1,
-		Execute: func(m *CPU) {
-			m.PSW.C = !m.PSW.C
-		},
+		Name:    "CMC",
+		Size:    1,
+		Execute: func(m *CPU) int { m.PSW.C = !m.PSW.C; return 1 },
 	}
 }
 
@@ -176,7 +187,7 @@ func CMP(r byte) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("CMP %s", RegisterCode(r)),
 		Size:    1,
-		Execute: func(m *CPU) { cmpA(m, lookup8(m.selectOperand(r))) },
+		Execute: func(m *CPU) int { cmpA(m, lookup8(m.selectOperand(r))); return 2 },
 	}
 }
 
@@ -185,7 +196,7 @@ func CPI(data byte) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("CPI 0x%02x", data),
 		Size:    2,
-		Execute: func(m *CPU) { cmpA(m, int16(data)) },
+		Execute: func(m *CPU) int { cmpA(m, int16(data)); return 2 },
 		Encode:  func(out []byte) { out[0], out[1] = 0xFE, data },
 	}
 }
@@ -195,7 +206,7 @@ func DAA() Instruction {
 	return Instruction{
 		Name: "DAA",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			if (m.Registers.A&0x0F) > 9 || m.PSW.A {
 				incA(m, int16(6), false)
 			}
@@ -204,6 +215,7 @@ func DAA() Instruction {
 				incA(m, int16(0x60), false)
 				m.PSW.A = oldA
 			}
+			return 1
 		},
 	}
 }
@@ -220,12 +232,13 @@ func DAD(rp byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("DAD %s", RegisterPairCode(rp)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			v1 := lookup32(m.selectDoubleOperand(2)) // HL registers.
 			v2 := lookup32(m.selectDoubleOperand(rp))
 
 			res := storeDoubleAdd(&m.Registers.H, &m.Registers.L, v1, v2)
 			m.PSW.C = res > 0xFFFF
+			return 3
 		},
 	}
 }
@@ -233,9 +246,12 @@ func DAD(rp byte) Instruction {
 // DCR implements the DCR instruction (Decrement Register or Memory).
 func DCR(r byte) Instruction {
 	return Instruction{
-		Name:    fmt.Sprintf("DCR %s", RegisterCode(r)),
-		Size:    1,
-		Execute: func(m *CPU) { addDst(m, ref8(m.selectOperand(r)), -1, false) },
+		Name: fmt.Sprintf("DCR %s", RegisterCode(r)),
+		Size: 1,
+		Execute: func(m *CPU) int {
+			addDst(m, ref8(m.selectOperand(r)), -1, false)
+			return 1
+		},
 	}
 }
 
@@ -244,16 +260,17 @@ func DCX(rp byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("DCX %s", RegisterPairCode(rp)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			h, l, sp := m.selectDoubleOperand(rp)
 			if sp != nil {
 				*sp--
-				return
+				return 1
 			}
 			v := uint16(*h)<<8 | uint16(*l)
 			v--
 			*h = byte((v >> 8) & 0xFF)
 			*l = byte(v & 0xFF)
+			return 2
 		},
 	}
 }
@@ -263,7 +280,7 @@ func LXI(rp byte, data uint16) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("LXI %s 0x%04x", RegisterPairCode(rp), data),
 		Size: 3,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			h, l, sp := m.selectDoubleOperand(rp)
 			if sp != nil {
 				*sp = data
@@ -271,6 +288,7 @@ func LXI(rp byte, data uint16) Instruction {
 				*h = byte((data >> 8) & 0xFF)
 				*l = byte(data & 0xFF)
 			}
+			return 3
 		},
 		Encode: func(out []byte) {
 			out[0], out[1], out[2] = 0x01|(rp<<4), byte(data&0xFF), byte(data>>8)
@@ -283,7 +301,7 @@ func POP(rp byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("POP %s", RegisterPairCode(rp)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			h, l, sp := m.selectDoubleOperand(rp)
 			if sp != nil {
 				h = &m.Registers.A
@@ -295,6 +313,7 @@ func POP(rp byte) Instruction {
 			}
 			*h = m.Memory[m.SP+1]
 			m.SP += 2
+			return 3
 		},
 	}
 }
@@ -304,7 +323,7 @@ func PUSH(rp byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("PUSH %s", RegisterPairCode(rp)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			var (
 				h, l *byte
 				sp   *uint16
@@ -319,6 +338,7 @@ func PUSH(rp byte) Instruction {
 
 			m.push8(*h)
 			m.push8(*l)
+			return 3
 		},
 	}
 }
@@ -328,13 +348,14 @@ func RAL() Instruction {
 	return Instruction{
 		Name: "RAL",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			carry := byte(0)
 			if m.PSW.C {
 				carry = 1
 			}
 			m.PSW.C = (m.Registers.A >> 7) == 1
 			m.Registers.A = (m.Registers.A << 1) | carry
+			return 1
 		},
 	}
 }
@@ -344,13 +365,14 @@ func RAR() Instruction {
 	return Instruction{
 		Name: "RAR",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			c := byte(0)
 			if m.PSW.C {
 				c = 0x80
 			}
 			m.PSW.C = m.Registers.A&1 == 1
 			m.Registers.A = (m.Registers.A >> 1) | c
+			return 1
 		},
 	}
 }
@@ -360,7 +382,7 @@ func STC() Instruction {
 	return Instruction{
 		Name:    "STC",
 		Size:    1,
-		Execute: func(m *CPU) { m.PSW.C = true },
+		Execute: func(m *CPU) int { m.PSW.C = true; return 1 },
 	}
 }
 
@@ -369,10 +391,11 @@ func RLC() Instruction {
 	return Instruction{
 		Name: "RLC",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			carry := m.Registers.A >> 7
 			m.Registers.A = (m.Registers.A << 1) | carry
 			m.PSW.C = carry == 1
+			return 1
 		},
 	}
 }
@@ -382,10 +405,11 @@ func RRC() Instruction {
 	return Instruction{
 		Name: "RRC",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			carry := m.Registers.A & 0x01
 			m.Registers.A = (m.Registers.A >> 1) | (carry << 7)
 			m.PSW.C = carry == 1
+			return 1
 		},
 	}
 }
@@ -395,10 +419,12 @@ func Rcnd(cnd ConditionCode) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("Rcnd %s", cnd),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			if cnd.Check(m) {
 				m.PC = m.pop16()
+				return 3
 			}
+			return 1
 		},
 	}
 }
@@ -408,7 +434,7 @@ func RET() Instruction {
 	return Instruction{
 		Name:    "RET",
 		Size:    1,
-		Execute: func(m *CPU) { m.PC = m.pop16() },
+		Execute: func(m *CPU) int { m.PC = m.pop16(); return 3 },
 	}
 }
 
@@ -417,9 +443,10 @@ func RST(n byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("RST %d", n),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.push16(m.PC + 1)
 			m.PC = uint16(n << 3)
+			return 3
 		},
 	}
 }
@@ -429,7 +456,7 @@ func SBB(r byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("SBB %s", RegisterCode(r)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			reg, mem := m.selectOperand(r)
 			var val int16
 			if mem != nil {
@@ -438,6 +465,7 @@ func SBB(r byte) Instruction {
 				val = int16(*reg)
 			}
 			addDst(m, &m.Registers.A, -val, true)
+			return 2
 		},
 	}
 }
@@ -447,8 +475,9 @@ func SBI(data byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("SBI 0x%02x", data),
 		Size: 2,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			addDst(m, &m.Registers.A, -int16(data), true)
+			return 2
 		},
 	}
 }
@@ -458,9 +487,10 @@ func SHLD(addr uint16) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("SHLD 0x%04x", addr),
 		Size: 3,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.Memory[addr] = m.Registers.L
 			m.Memory[addr+1] = m.Registers.H
+			return 5
 		},
 	}
 }
@@ -470,8 +500,9 @@ func SPHL() Instruction {
 	return Instruction{
 		Name: "SPHL",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.SP = uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
+			return 1
 		},
 	}
 }
@@ -481,8 +512,9 @@ func STA(addr uint16) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("STA 0x%04x", addr),
 		Size: 3,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.Memory[addr] = m.Registers.A
+			return 4
 		},
 	}
 }
@@ -492,12 +524,13 @@ func STAX(rp byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("STAX %s", RegisterPairCode(rp)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			h, l, sp := m.selectDoubleOperand(rp)
 			if sp != nil {
 				panic("STAX with SP")
 			}
 			m.Memory[uint16(*h)<<8|uint16(*l)] = m.Registers.A
+			return 2
 		},
 	}
 }
@@ -507,9 +540,10 @@ func SUB(r byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("SUB %s", RegisterCode(r)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			val := lookup8(m.selectOperand(r))
 			addDst(m, &m.Registers.A, -val, false)
+			return 2
 		},
 	}
 }
@@ -519,7 +553,7 @@ func SUI(data byte) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("SUI 0x%02x", data),
 		Size:    2,
-		Execute: func(m *CPU) { addDst(m, &m.Registers.A, -int16(data), false) },
+		Execute: func(m *CPU) int { addDst(m, &m.Registers.A, -int16(data), false); return 2 },
 	}
 }
 
@@ -528,9 +562,10 @@ func XCHG() Instruction {
 	return Instruction{
 		Name: "XCHG",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.Registers.H, m.Registers.D = m.Registers.D, m.Registers.H
 			m.Registers.L, m.Registers.E = m.Registers.E, m.Registers.L
+			return 1
 		},
 	}
 }
@@ -540,11 +575,12 @@ func XTHL() Instruction {
 	return Instruction{
 		Name: "XTHL",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			top := m.Memory[m.SP]
 			next := m.Memory[m.SP+1]
 			m.Memory[m.SP], m.Registers.L = m.Registers.L, top
 			m.Memory[m.SP+1], m.Registers.H = m.Registers.H, next
+			return 5
 		},
 	}
 }
@@ -554,10 +590,11 @@ func XRI(data byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("XRI 0x%02x", data),
 		Size: 2,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.Registers.A ^= data
 			m.setZSPC(int16(m.Registers.A))
 			m.PSW.C = false
+			return 2
 		},
 	}
 }
@@ -567,10 +604,11 @@ func XRA(r byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("XRA %s", RegisterCode(r)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.Registers.A ^= byte(lookup8(m.selectOperand(r)))
 			m.setZSPC(int16(m.Registers.A))
 			m.PSW.C = false
+			return 2
 		},
 	}
 }
@@ -580,9 +618,10 @@ func LHLD(addr uint16) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("LHLD 0x%04x", addr),
 		Size: 3,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.Registers.L = m.Memory[addr]
 			m.Registers.H = m.Memory[addr+1]
+			return 5
 		},
 		Encode: func(out []byte) {
 			out[0], out[1], out[2] = 0x2A, byte(addr&0xFF), byte(addr>>8)
@@ -595,12 +634,14 @@ func INR(r byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("INR %s", RegisterCode(r)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			reg, mem := m.selectOperand(r)
 			if mem != nil {
 				addDst(m, &mem[0], 1, false)
+				return 3
 			} else {
 				addDst(m, reg, 1, false)
+				return 1
 			}
 		},
 	}
@@ -611,13 +652,14 @@ func INX(rp byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("INX %s", RegisterPairCode(rp)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			h, l, sp := m.selectDoubleOperand(rp)
 			if sp != nil {
 				*sp++
-				return
+				return 1
 			}
 			storeDoubleAdd(h, l, int32(*h)<<8|int32(*l), 1)
+			return 1
 		},
 	}
 }
@@ -627,7 +669,7 @@ func LDA(addr uint16) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("LDA 0x%04x", addr),
 		Size:    3,
-		Execute: func(m *CPU) { m.Registers.A = m.Memory[addr] },
+		Execute: func(m *CPU) int { m.Registers.A = m.Memory[addr]; return 4 },
 		Encode:  func(out []byte) { out[0], out[1], out[2] = 0x3A, byte(addr&0xFF), byte(addr>>8) },
 	}
 }
@@ -637,12 +679,13 @@ func LDAX(rp byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("LDAX %s", RegisterPairCode(rp)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			h, l, sp := m.selectDoubleOperand(rp)
 			if sp != nil {
 				panic("LDAX with SP")
 			}
 			m.Registers.A = m.Memory[uint16(*h)<<8|uint16(*l)]
+			return 2
 		},
 	}
 }
@@ -652,7 +695,7 @@ func JMP(addr uint16) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("JMP 0x%04x", addr),
 		Size:    3,
-		Execute: func(m *CPU) { m.PC = addr },
+		Execute: func(m *CPU) int { m.PC = addr; return 3 },
 		Encode:  func(out []byte) { out[0], out[1], out[2] = 0xC3, byte(addr&0xFF), byte(addr>>8) },
 	}
 }
@@ -661,10 +704,12 @@ func JCnd(cnd ConditionCode, addr uint16) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("JCnd %s 0x%04x", cnd, addr),
 		Size: 3,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			if cnd.Check(m) {
 				m.PC = addr
+				return 3
 			}
+			return 1
 		},
 		Encode: func(out []byte) {
 			out[0], out[1], out[2] = 0xC2|(byte(cnd)<<3), byte(addr&0xFF), byte(addr>>8)
@@ -676,7 +721,7 @@ func NOP() Instruction {
 	return Instruction{
 		Name:    "NOP",
 		Size:    1,
-		Execute: func(m *CPU) {},
+		Execute: func(m *CPU) int { return 1 },
 		Encode:  func(out []byte) { out[0] = 0 },
 	}
 }
@@ -686,7 +731,8 @@ func EI() Instruction {
 	return Instruction{
 		Name:    "EI",
 		Size:    1,
-		Execute: func(m *CPU) { m.Interrupts = true },
+		Execute: func(m *CPU) int { m.Interrupts = true; return 1 },
+		Encode:  func(out []byte) { out[0] = 0xFB },
 	}
 }
 
@@ -695,7 +741,8 @@ func DI() Instruction {
 	return Instruction{
 		Name:    "DI",
 		Size:    1,
-		Execute: func(m *CPU) { m.Interrupts = false },
+		Execute: func(m *CPU) int { m.Interrupts = false; return 1 },
+		Encode:  func(out []byte) { out[0] = 0xF3 },
 	}
 }
 
@@ -704,7 +751,8 @@ func HLT() Instruction {
 	return Instruction{
 		Name:    "HLT",
 		Size:    1,
-		Execute: func(m *CPU) { m.PC = 0 },
+		Execute: func(m *CPU) int { m.PC = 0; return 1 },
+		Encode:  func(out []byte) { out[0] = 0x76 },
 	}
 }
 
@@ -713,7 +761,7 @@ func IN(port byte) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("IN 0x%02x", port),
 		Size:    2,
-		Execute: func(m *CPU) { m.Registers.A = m.In[port] },
+		Execute: func(m *CPU) int { m.Registers.A = m.In[port]; return 3 },
 	}
 }
 
@@ -722,7 +770,7 @@ func MOV(dst byte, src byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("MOV %s, %s", RegisterCode(dst), RegisterCode(src)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			srcR, srcMem := m.selectOperand(src)
 			var val byte
 			if srcMem != nil {
@@ -736,6 +784,10 @@ func MOV(dst byte, src byte) Instruction {
 			} else {
 				*dstR = val
 			}
+			if srcMem != nil || dstMem != nil {
+				return 2
+			}
+			return 1
 		},
 		Encode: func(out []byte) {
 			out[0] = 0x60 | dst<<3 | src
@@ -748,12 +800,14 @@ func MVI(dst byte, data byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("MVI %s, 0x%02x", RegisterCode(dst), data),
 		Size: 2,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			dstR, dstMem := m.selectOperand(dst)
 			if dstMem != nil {
 				dstMem[0] = data
+				return 3
 			} else {
 				*dstR = data
+				return 2
 			}
 		},
 		Encode: func(out []byte) { out[0], out[1] = 0x06|(dst<<3), data },
@@ -765,12 +819,14 @@ func ORA(r byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("ORA %s", RegisterCode(r)),
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			r, mem := m.selectOperand(r)
 			if mem != nil {
 				orA(m, mem[0])
+				return 2
 			} else {
 				orA(m, *r)
+				return 2
 			}
 		},
 	}
@@ -781,7 +837,7 @@ func ORI(data byte) Instruction {
 	return Instruction{
 		Name:    fmt.Sprintf("ORI 0x%02x", data),
 		Size:    2,
-		Execute: func(m *CPU) { orA(m, data) },
+		Execute: func(m *CPU) int { orA(m, data); return 2 },
 	}
 }
 
@@ -790,8 +846,9 @@ func PCHL() Instruction {
 	return Instruction{
 		Name: "PCHL",
 		Size: 1,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.PC = uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
+			return 1
 		},
 	}
 }
@@ -801,8 +858,9 @@ func OUT(port byte) Instruction {
 	return Instruction{
 		Name: fmt.Sprintf("OUT 0x%02x", port),
 		Size: 2,
-		Execute: func(m *CPU) {
+		Execute: func(m *CPU) int {
 			m.Out[port] = m.Registers.A
+			return 3
 		},
 	}
 }
