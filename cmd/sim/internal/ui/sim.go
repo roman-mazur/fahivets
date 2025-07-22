@@ -22,7 +22,7 @@ var (
 	monitor []byte
 
 	//go:embed progs/rain.rks
-	rainRks []byte
+	programRks []byte
 
 	m = fahivets.NewComputer()
 )
@@ -65,13 +65,13 @@ func runSimulation(m *fahivets.Computer, newFrames, processedFrames chan image.I
 		}
 	}
 
-	// Load the rain game.
-	rainProg, err := fahivets.ReadRks(bytes.NewReader(rainRks))
+	// Load the program.
+	program, err := fahivets.ReadRks(bytes.NewReader(programRks))
 	if err != nil {
 		panic(err)
 	}
-	copy(m.CPU.Memory[rainProg.StartAddress:], rainProg.Content)
-	m.CPU.Exec(arch.JMP(rainProg.StartAddress))
+	copy(m.CPU.Memory[program.StartAddress:], program.Content)
+	m.CPU.Exec(arch.JMP(program.StartAddress))
 
 	var dp displayPipeline
 	for {

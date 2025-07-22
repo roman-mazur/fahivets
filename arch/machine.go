@@ -153,7 +153,7 @@ func (m *CPU) selectOperand(s byte) (reg *byte, mem []byte) {
 		reg = &m.Registers.L
 	case RegisterSelMemory:
 		addr := uint16(m.Registers.H)<<8 | uint16(m.Registers.L)
-		if addr >= 0xFFFF {
+		if addr > 0xFFFF {
 			panic(fmt.Errorf("memory address out of range %04x", addr))
 		}
 		mem = m.Memory[addr:]
