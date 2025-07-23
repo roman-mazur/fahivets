@@ -110,6 +110,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					A: 0x06, // A = A + 5
 				},
+				PSW: PSW{P: true},
 			},
 			expectedSize: 2,
 		},
@@ -121,16 +122,13 @@ func TestDecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					A: 0x01,
 				},
-				PSW: PSW{
-					C: true, //Carry is set
-				},
+				PSW: PSW{C: true},
 			},
 			expectedState: CPU{
 				PC: 0x1002,
 				Registers: Registers{
 					A: 0x07, // A = A + 5 + Carry
 				},
-				PSW: PSW{P: true},
 			},
 			expectedSize: 2,
 		},
@@ -150,9 +148,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					A: 0x00,
 					B: 0x01,
 				},
-				PSW: PSW{
-					Z: true,
-				},
+				PSW: PSW{Z: true, P: true},
 			},
 			expectedSize: 1,
 		},
@@ -170,9 +166,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					A: 0x00,
 				},
-				PSW: PSW{
-					Z: true,
-				},
+				PSW: PSW{Z: true, P: true},
 			},
 			expectedSize: 2,
 		},
@@ -230,7 +224,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					A: 0x02,
 					E: 0x05,
 				},
-				PSW: PSW{C: true, S: true, P: true, A: true},
+				PSW: PSW{C: true, S: true, A: true},
 			},
 			expectedSize: 1,
 		},
@@ -251,7 +245,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					A: 0x0A,
 					E: 0x0A,
 				},
-				PSW: PSW{Z: true}, // Carry flag reset, Zero flag set
+				PSW: PSW{Z: true, P: true}, // Carry flag reset, Zero flag set
 			},
 			expectedSize: 1,
 		},
@@ -305,9 +299,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					B: 0x00,
 				},
-				PSW: PSW{
-					Z: true,
-				},
+				PSW: PSW{Z: true, P: true},
 			},
 			expectedSize: 1,
 		},
@@ -375,9 +367,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					A: 0x00,
 					B: 0x0A,
 				},
-				PSW: PSW{
-					Z: true,
-				},
+				PSW: PSW{Z: true, P: true},
 			},
 			expectedSize: 1,
 		},
@@ -481,7 +471,7 @@ func TestDecodeAndExecute(t *testing.T) {
 			expectedState: CPU{
 				PC:        0x1001,
 				Registers: Registers{A: 0x01},
-				PSW:       PSW{C: true, P: true, A: true},
+				PSW:       PSW{C: true, A: true},
 			},
 			expectedSize: 1,
 		},
@@ -555,7 +545,6 @@ func TestDecodeAndExecute(t *testing.T) {
 				},
 				PC:     0x1001,
 				SP:     0x2000,
-				PSW:    PSW{P: true},
 				Memory: [65536]byte{0x3A7C: 0x01}, // Memory decremented
 			},
 			expectedSize: 1,
@@ -574,9 +563,8 @@ func TestDecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					A: 41,
 				},
-				PC:  0x1001,
-				SP:  0x2000,
-				PSW: PSW{P: true},
+				PC: 0x1001,
+				SP: 0x2000,
 			},
 			expectedSize: 1,
 		},
@@ -811,16 +799,15 @@ func TestDecodeAndExecute(t *testing.T) {
 					A: 0x3E,
 					B: 0x2A,
 				},
-				PSW: PSW{C: false},
-				PC:  0x1000,
-				SP:  0x2000,
+				PC: 0x1000,
+				SP: 0x2000,
 			},
 			expectedState: CPU{
 				Registers: Registers{
 					A: 0x14,
 					B: 0x2A,
 				},
-				PSW: PSW{C: false, S: false, Z: false, P: false, A: false},
+				PSW: PSW{P: true},
 				PC:  0x1001,
 				SP:  0x2000,
 			},
@@ -844,7 +831,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				},
 				PC:  0x1001,
 				SP:  0x2000,
-				PSW: PSW{Z: true},
+				PSW: PSW{Z: true, P: true},
 			},
 			expectedSize: 1,
 		},
@@ -865,7 +852,7 @@ func TestDecodeAndExecute(t *testing.T) {
 					A: 0x01,
 					L: 0x02,
 				},
-				PSW: PSW{A: true, P: true},
+				PSW: PSW{A: true},
 				PC:  0x1001,
 				SP:  0x2000,
 			},
@@ -878,15 +865,14 @@ func TestDecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					A: 0x3E,
 				},
-				PSW: PSW{C: false},
-				PC:  0x1000,
-				SP:  0x2000,
+				PC: 0x1000,
+				SP: 0x2000,
 			},
 			expectedState: CPU{
 				Registers: Registers{
 					A: 0x14,
 				},
-				PSW: PSW{C: false, S: false, Z: false, P: false, A: false},
+				PSW: PSW{P: true},
 				PC:  0x1002,
 				SP:  0x2000,
 			},
@@ -925,7 +911,7 @@ func TestDecodeAndExecute(t *testing.T) {
 			},
 			expectedState: CPU{
 				// Zero registers.
-				PSW: PSW{Z: true, A: true},
+				PSW: PSW{Z: true, A: true, P: true},
 				PC:  0x1002,
 				SP:  0x2000,
 			},
@@ -1069,7 +1055,7 @@ func TestDecodeAndExecute(t *testing.T) {
 				Registers: Registers{
 					A: 0x00,
 				},
-				PSW: PSW{Z: true, P: false},
+				PSW: PSW{Z: true, P: true},
 			},
 			expectedSize: 1,
 		},
