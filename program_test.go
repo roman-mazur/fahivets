@@ -150,7 +150,7 @@ func advance(t *testing.T, m *fahivets.Computer, steps int, debug bool) {
 	tOut := testutil.NewTestLogWriter(t)
 	for i := range steps {
 		addr := m.CPU.PC
-		cmd, err := m.Step()
+		cmd, _, err := m.Step()
 		if err != nil {
 			t.Logf("%05d 0x%04x:\t%s", i, addr, &m.CPU)
 			if debug {
