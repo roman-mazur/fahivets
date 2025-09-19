@@ -41,34 +41,11 @@ func (c *Computer) Shutdown() {
 	c.portBComposer.ShutDown()
 }
 
-func (c *Computer) Step() (cmd arch.Instruction, err error) {
-	var cycles int
+func (c *Computer) Step() (cmd arch.Instruction, cycles int, err error) {
 	cmd, cycles, err = c.CPU.Step()
 	if err != nil {
 		return
 	}
 	c.ioCtl.Sync()
-
-	c.cyclesSinceSleep += cycles
 	return
-}
-
-func (c *Computer) SimSleep() {
-	const frequency = 2_000_000 // 2MHz
-
-	simDuration := time.Second * time.Duration(c.cyclesSinceSleep) / frequency
-	passed := time.Since(c.lastSleep)
-
-	if simDuration < 10*time.Millisecond { // TODO: fix.
-		return
-	}
-
-	diff := simDuration - passed
-	if diff < 0 {
-		c.lastSleep = time.Now()
-		return
-	}
-	time.Sleep(diff)
-	c.cyclesSinceSleep = 0
-	c.lastSleep = time.Now()
 }

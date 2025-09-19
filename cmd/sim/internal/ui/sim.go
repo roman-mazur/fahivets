@@ -1,5 +1,3 @@
-//go:build js
-
 package main
 
 import (
@@ -7,7 +5,7 @@ import (
 	_ "embed"
 	"image"
 	"log"
-	"syscall/js"
+	"time"
 
 	"golang.org/x/image/draw"
 	"rmazur.io/fahivets"
@@ -28,15 +26,35 @@ var (
 )
 
 func main() {
-	var ui UiWorld
+	ui := makeUiWorld()
 
-	ui = &jsUiWorld{root: js.Global()}
-	newFrames := make(chan image.Image, 1)
-	processedFrames := make(chan image.Image)
+	prepareSimulation(m)
 
-	go runSimulation(m, newFrames, processedFrames)
+	frame := m.Display.Image()
+	size := frame.Bounds()
+	frameBuf := image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
+	fillBuf(frameBuf, frame)
 
-	ui.ConsumeDisplayFrames(newFrames, processedFrames)
+	lastCall := time.Now()
+	ui.ConsumeDisplayFrames(func() image.Image {
+		d := time.Since(lastCall)
+		const cpuFreq = 2_000_000 // 2 MHz
+		perFrame := int((d*cpuFreq)/time.Second) * 2
+
+		n := 0
+		for n < perFrame {
+			_, c, err := m.Step()
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			n += c
+		}
+		fillBuf(frameBuf, m.Display.Image())
+		lastCall = time.Now()
+		return frameBuf
+	})
+
 	ui.ConnectKeyboard(m.Keyboard)
 
 	var done chan struct{}
@@ -44,11 +62,11 @@ func main() {
 }
 
 type UiWorld interface {
-	ConsumeDisplayFrames(newFrames, processedFrames chan image.Image)
+	ConsumeDisplayFrames(frameF func() image.Image)
 	ConnectKeyboard(keyboard *devices.Keyboard)
 }
 
-func runSimulation(m *fahivets.Computer, newFrames, processedFrames chan image.Image) {
+func prepareSimulation(m *fahivets.Computer) {
 	// Note: it should be possible to minimize the exe size if we link
 	// programs directly to the CPU.Memory.
 	romStart := arch.MemoryMapping(arch.MemROM2K)
@@ -58,7 +76,7 @@ func runSimulation(m *fahivets.Computer, newFrames, processedFrames chan image.I
 
 	// Make sure bootloader is executed.
 	for range 16_000 {
-		_, err := m.Step()
+		_, _, err := m.Step()
 		if err != nil {
 			log.Println(err)
 			return
@@ -72,53 +90,8 @@ func runSimulation(m *fahivets.Computer, newFrames, processedFrames chan image.I
 	}
 	copy(m.CPU.Memory[program.StartAddress:], program.Content)
 	m.CPU.Exec(arch.JMP(program.StartAddress))
-
-	var dp displayPipeline
-	for {
-		_, err := m.Step()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		dp.Advance(newFrames, processedFrames, m.Display)
-		m.SimSleep()
-	}
 }
 
-type displayPipeline struct {
-	init bool
-	buf  *image.RGBA
-}
-
-func (dp *displayPipeline) Advance(newFrames, processedFrames chan image.Image, display *devices.Display) {
-	dp.ensureBuffers(display)
-
-	var out, in chan image.Image
-	if dp.buf != nil {
-		out = newFrames
-	} else {
-		in = processedFrames
-	}
-	select {
-	case out <- dp.buf:
-		dp.buf = nil
-	case buf := <-in:
-		dp.buf = buf.(*image.RGBA)
-		dp.fillBuf(display.Image())
-	default:
-	}
-}
-
-func (dp *displayPipeline) ensureBuffers(display *devices.Display) {
-	if !dp.init {
-		dp.init = true
-		frame := display.Image()
-		size := frame.Bounds()
-		dp.buf = image.NewRGBA(image.Rect(0, 0, size.Dx()*2, size.Dy()*2))
-		dp.fillBuf(frame)
-	}
-}
-
-func (dp *displayPipeline) fillBuf(frame image.Image) {
-	draw.NearestNeighbor.Scale(dp.buf, dp.buf.Bounds(), frame, frame.Bounds(), draw.Src, nil)
+func fillBuf(buf *image.RGBA, frame image.Image) {
+	draw.NearestNeighbor.Scale(buf, buf.Bounds(), frame, frame.Bounds(), draw.Src, nil)
 }

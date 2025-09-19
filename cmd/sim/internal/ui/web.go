@@ -11,18 +11,20 @@ import (
 	"rmazur.io/fahivets/devices"
 )
 
+func makeUiWorld() UiWorld {
+	return &jsUiWorld{root: js.Global()}
+}
+
 type jsUiWorld struct {
 	root js.Value
 }
 
-func (w *jsUiWorld) ConsumeDisplayFrames(newFrames, processedFrames chan image.Image) {
+func (w *jsUiWorld) ConsumeDisplayFrames(f func() image.Image) {
 	const callName = "requestAnimationFrame"
 
 	var jsHandler js.Func
 	jsHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		frame := <-newFrames
-		renderDisplayImage(imageToRGBA(frame))
-		processedFrames <- frame
+		renderDisplayImage(imageToRGBA(f()))
 
 		w.root.Call(callName, jsHandler)
 		return nil
